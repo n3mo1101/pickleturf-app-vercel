@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/bookings/cron/update-statuses/",
-      "schedule": "0 * * * *"
+      "schedule": "0 16 * * *"
     }
   ]
 }

@@ -196,7 +196,9 @@ def get_available_slots_for_court(court, selected_date):
 
 def auto_update_booking_statuses():
     """
-    Run on relevant page loads to keep booking statuses current.
+    Keep booking statuses current. Called by the daily Vercel Cron endpoint
+    (`/bookings/cron/update-statuses/`, midnight Singapore time) and the
+    `update_booking_statuses` management command.
 
     Rules:
       - CONFIRMED + time passed → COMPLETED, transaction → PAID
