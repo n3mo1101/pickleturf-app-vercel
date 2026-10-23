@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "config/wsgi.py": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/bookings/cron/update-statuses/",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

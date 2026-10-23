@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import models
 from django.utils import timezone
+from django.views.decorators.http import require_GET
 from courts.models import Court
 from accounts.decorators import admin_or_staff_required
 from .forms import BookingForm
@@ -334,3 +335,25 @@ def staff_bookings_view(request):
     return render(request, 'bookings/staff_bookings.html', {
         'bookings': bookings,
     })
+
+
+# ── Cron ───────────────────────────────────────────────────────────────────────
+
+@require_GET
+def cron_update_statuses(request):
+    """
+    Called hourly by Vercel Cron. Protected by CRON_SECRET:
+    Vercel sends `Authorization: Bearer <CRON_SECRET>` on each invocation.
+    """
+    from django.conf import settings as django_settings
+    from django.http import JsonResponse
+
+    secret = django_settings.CRON_SECRET
+    if not secret:
+        return JsonResponse({'error': 'CRON_SECRET not configured'}, status=503)
+
+    if request.META.get('HTTP_AUTHORIZATION', '') != f'Bearer {secret}':
+        return JsonResponse({'error': 'unauthorized'}, status=401)
+
+    services.auto_update_booking_statuses()
+    return JsonResponse({'status': 'ok'})

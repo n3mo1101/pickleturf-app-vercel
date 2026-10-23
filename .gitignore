@@ -129,6 +129,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.vercel
 .venv
 env/
 venv/
@@ -185,3 +186,9 @@ cython_debug/
 media/
 staticfiles/
 static_root/
+
+# Vercel
+.vercel/
+.env.local
+.env*.local
+.vercelignore

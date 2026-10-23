@@ -211,6 +211,7 @@ DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
         conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
@@ -246,6 +247,10 @@ if not DEBUG:
     CSRF_TRUSTED_ORIGINS = [
     f"https://{host}" for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host
     ]
+
+# ─── CRON (Vercel Cron) ───────────────────────────────────────────────────────
+# Vercel sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set.
+CRON_SECRET = os.environ.get('CRON_SECRET', '')
 
 # ─── BOOKING CONFIGURATION ──────────────────────────────────────────────────────
 BOOKING_OPENING_HOUR = 8    # 8:00 AM

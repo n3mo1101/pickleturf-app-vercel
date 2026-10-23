@@ -17,4 +17,7 @@ urlpatterns = [
     path('admin/<int:pk>/cancel/', views.admin_booking_cancel_view, name='admin_cancel'),
     path('admin/<int:pk>/status/', views.admin_booking_status_view, name='admin_status'),
     path('staff/', views.staff_bookings_view, name='staff_bookings'),
+
+    # Cron (Vercel)
+    path('cron/update-statuses/', views.cron_update_statuses, name='cron_update_statuses'),
 ]
