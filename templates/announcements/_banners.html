@@ -1,0 +1,18 @@
+{% if active_announcements %}
+    {% for ann in active_announcements %}
+    <div class="alert alert-{{ ann.level }} alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom"
+         role="alert">
+        <div class="container">
+            <strong>{{ ann.title }}</strong>
+            {% if ann.body %}
+            · <span>{{ ann.body }}</span>
+            {% endif %}
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Close">
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}

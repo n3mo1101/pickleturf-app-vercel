@@ -1,0 +1,202 @@
+{% extends 'layouts/base.html' %}
+{% block title %}My bookings{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">My bookings</h1>
+        <p class="pt-page-subtitle">Your reservations and payments</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'bookings:create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> New booking
+        </a>
+    </div>
+</header>
+
+{# ── Summary ── #}
+<div class="row g-3 mb-4">
+    <div class="col-6">
+        <div class="card border-0 bg-light text-center py-3">
+            <div class="fs-4 fw-bold">{{ total_bookings }}</div>
+            <div class="small text-muted">Total bookings</div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card border-0 bg-light text-center py-3">
+            <div class="fs-4 fw-bold">₱{{ total_spent|floatformat:2 }}</div>
+            <div class="small text-muted">Total spent</div>
+        </div>
+    </div>
+</div>
+
+{% if bookings %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Court</th>
+                <th>Time</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in bookings %}
+            <tr>
+                <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
+                <td data-label="Court">{{ b.court.name }}</td>
+                <td data-label="Time" class="text-nowrap">
+                    {{ b.start_time|time:"g:i A" }} – {{ b.end_time|time:"g:i A" }}
+                </td>
+                <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
+                <td data-label="Status">
+                    {% if b.status == 'confirmed' %}
+                        <span class="badge bg-success">Confirmed</span>
+                    {% elif b.status == 'cancelled' %}
+                        <span class="badge bg-danger">Cancelled</span>
+                    {% elif b.status == 'completed' %}
+                        <span class="badge bg-secondary">Completed</span>
+                    {% else %}
+                        <span class="badge bg-warning">{{ b.get_status_display }}</span>
+                    {% endif %}
+                    {% if b.transaction.payment_status == 'paid' %}
+                        <span class="badge bg-success ms-1">Paid</span>
+                    {% elif b.transaction.payment_status == 'refunded' %}
+                        <span class="badge bg-danger ms-1">Refunded</span>
+                    {% elif b.transaction.payment_status == 'waived' %}
+                        <span class="badge bg-secondary ms-1">Waived</span>
+                    {% elif b.transaction and b.transaction.amount > 0 %}
+                        <span class="badge bg-warning ms-1">Unpaid</span>
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    {% if payments_enabled and b.status == 'pending' and b.transaction and b.transaction.payment_status == 'pending' and b.transaction.amount > 0 %}
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for booking on {{ b.date|date:"M d" }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'transactions:pay_online' b.transaction.pk %}">
+                                    <i class="bi bi-credit-card"></i> Pay now
+                                </a>
+                            </li>
+                            {% if b.is_cancellable %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'bookings:cancel' b.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Cancel booking"
+                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} at {{ b.start_time|time:"g:i A" }} will be released."
+                                      data-pt-confirm-label="Cancel booking"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-x-circle"></i> Cancel booking
+                                    </button>
+                                </form>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% elif b.is_cancellable %}
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for booking on {{ b.date|date:"M d" }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post"
+                                      action="{% url 'bookings:cancel' b.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Cancel booking"
+                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} at {{ b.start_time|time:"g:i A" }} will be released."
+                                      data-pt-confirm-label="Cancel booking"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-x-circle"></i> Cancel booking
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# ── Pagination ── #}
+{% if bookings.has_other_pages %}
+<nav class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% if bookings.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ bookings.previous_page_number }}">
+                &laquo; Prev
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo; Prev</span>
+        </li>
+        {% endif %}
+        {% for num in bookings.paginator.page_range %}
+            {% if bookings.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > bookings.number|add:'-3' and num < bookings.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        {% if bookings.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ bookings.next_page_number }}">
+                Next &raquo;
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Next &raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+    <p class="text-center text-muted small mb-0">
+        Page {{ bookings.number }} of {{ bookings.paginator.num_pages }}
+        · {{ total_bookings }} booking{{ total_bookings|pluralize }}
+    </p>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="card">
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.5;"></i>
+        <p class="mt-3 mb-3">No bookings yet.</p>
+        <a href="{% url 'bookings:create' %}" class="btn btn-primary">
+            Book a court
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

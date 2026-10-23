@@ -1,0 +1,129 @@
+{% extends 'layouts/base.html' %}
+{% block title %}All bookings{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">All bookings</h1>
+        <p class="pt-page-subtitle">Every reservation across all courts</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'bookings:admin_create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Create booking
+        </a>
+    </div>
+</header>
+
+{# ── Filters ── #}
+<form method="get" class="pt-filters">
+    <select name="status" class="form-select">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="court" class="form-select">
+        <option value="">All courts</option>
+        {% for court in courts %}
+        <option value="{{ court.id }}" {% if court_filter == court.id|stringformat:"s" %}selected{% endif %}>
+            {{ court.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <input type="date" name="date" class="form-control" value="{{ date_filter }}">
+    <button class="btn btn-primary" type="submit">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+    <a href="{% url 'bookings:admin_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-eraser"></i> Clear
+    </a>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>Court</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in bookings %}
+            <tr>
+                <td data-label="#" class="text-muted">{{ b.id }}</td>
+                <td data-label="Customer">
+                    <span class="fw-semibold">{{ b.user.full_name }}</span><br>
+                    <small class="text-muted">{{ b.user.email }}</small>
+                </td>
+                <td data-label="Court">{{ b.court.name }}</td>
+                <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
+                <td data-label="Time" class="text-nowrap">{{ b.start_time|time:"g:i A" }} – {{ b.end_time|time:"g:i A" }}</td>
+                <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
+                <td data-label="Status">
+                    {% if b.status == 'confirmed' %}<span class="badge bg-success">Confirmed</span>
+                    {% elif b.status == 'cancelled' %}<span class="badge bg-danger">Cancelled</span>
+                    {% elif b.status == 'completed' %}<span class="badge bg-secondary">Completed</span>
+                    {% else %}<span class="badge bg-warning">{{ b.get_status_display }}</span>
+                    {% endif %}
+                    {% if b.transaction %}
+                        {% if b.transaction.payment_status == 'paid' %}<span class="badge bg-success ms-1">Paid</span>
+                        {% elif b.transaction.payment_status == 'pending' %}<span class="badge bg-warning ms-1">Unpaid</span>
+                        {% elif b.transaction.payment_status == 'waived' %}<span class="badge bg-secondary ms-1">Waived</span>
+                        {% elif b.transaction.payment_status == 'refunded' %}<span class="badge bg-danger ms-1">Refunded</span>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for booking #{{ b.id }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'bookings:admin_status' b.pk %}">
+                                    <i class="bi bi-pencil"></i> Update status
+                                </a>
+                            </li>
+                            {% if b.is_cancellable %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'bookings:admin_cancel' b.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Cancel booking"
+                                      data-pt-confirm-body="Booking #{{ b.id }} for {{ b.court.name }} on {{ b.date|date:"M d" }} at {{ b.start_time|time:"g:i A" }} will be released."
+                                      data-pt-confirm-label="Cancel booking"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-x-circle"></i> Cancel booking
+                                    </button>
+                                </form>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="bi bi-calendar-x"></i>
+                    No bookings found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

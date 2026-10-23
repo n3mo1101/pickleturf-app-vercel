@@ -1,0 +1,201 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Inventory{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Inventory</h1>
+        <p class="pt-page-subtitle">
+            {% if low_stock_count > 0 %}
+            <span class="badge bg-warning">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                {{ low_stock_count }} low on stock
+            </span>
+            {% else %}
+            Manage items for sale and rent
+            {% endif %}
+        </p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'inventory:admin_create' %}"
+           class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Add item
+        </a>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary btn-icon-outline"
+                    data-bs-toggle="dropdown"
+                    aria-label="More options"
+                    aria-expanded="false">
+                <i class="bi bi-three-dots-vertical"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="{% url 'inventory:admin_categories' %}">
+                        <i class="bi bi-tags"></i> Categories
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'inventory:shop' %}">
+                        <i class="bi bi-shop"></i> Shop view
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+{# ── Filters ── #}
+<form method="get" class="pt-filters">
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+    <input type="search" name="q" class="form-control"
+           placeholder="Search items..." value="{{ search_query }}">
+
+    <select name="category" class="form-select">
+        <option value="">All categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.id }}"
+            {% if category_filter == cat.id|stringformat:"s" %}selected{% endif %}>
+            {{ cat.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <select name="type" class="form-select">
+        <option value="">All types</option>
+        {% for val, label in type_choices %}
+        <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>
+            {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+    <select name="stock" class="form-select">
+        <option value="">All stock</option>
+        <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>
+            Low (&le;5)
+        </option>
+        <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>
+            Out of stock
+        </option>
+    </select>
+    <a href="{% url 'inventory:admin_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-eraser"></i> Clear
+    </a>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Sale Price</th>
+                <th>Rent Price</th>
+                <th>Stock</th>
+                <th>Status</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr {% if item.stock == 0 %}class="table-danger"
+                {% elif item.stock <= 5 %}class="table-warning"{% endif %}>
+                <td data-label="Item">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if item.image %}
+                        <img src="{{ item.image.url }}" width="36" height="36"
+                             class="rounded" style="object-fit:cover;" alt="">
+                        {% else %}
+                        <div class="bg-navy rounded d-flex align-items-center
+                                    justify-content-center text-white"
+                             style="width:36px;height:36px;font-size:.8rem;">
+                            <i class="bi bi-box-seam"></i>
+                        </div>
+                        {% endif %}
+                        <span class="fw-semibold">{{ item.name }}</span>
+                    </div>
+                </td>
+                <td data-label="Category">{{ item.category.name|default:"—" }}</td>
+                <td data-label="Type">
+                    <span class="badge
+                        {% if item.item_type == 'sale' %}bg-primary
+                        {% elif item.item_type == 'rent' %}bg-warning
+                        {% else %}bg-success{% endif %}">
+                        {{ item.get_item_type_display }}
+                    </span>
+                </td>
+                <td data-label="Sale Price">{% if item.sale_price %}₱{{ item.sale_price }}{% else %}—{% endif %}</td>
+                <td data-label="Rent Price">{% if item.rent_price %}₱{{ item.rent_price }}{% else %}—{% endif %}</td>
+                <td data-label="Stock">
+                    <span class="fw-bold
+                        {% if item.stock == 0 %}text-danger
+                        {% elif item.stock <= 5 %}text-warn{% endif %}">
+                        {{ item.stock }}
+                    </span>
+                </td>
+                <td data-label="Status">
+                    {% if item.is_active %}
+                    <span class="badge bg-success">Active</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for {{ item.name }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'inventory:admin_detail' item.pk %}">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'inventory:admin_edit' item.pk %}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'inventory:admin_stock' item.pk %}">
+                                    <i class="bi bi-boxes"></i> Adjust stock
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'inventory:admin_delete' item.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Delete item"
+                                      data-pt-confirm-body="&quot;{{ item.name|escapejs }}&quot; will be permanently removed. This cannot be undone."
+                                      data-pt-confirm-label="Delete"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="bi bi-box-seam"></i>
+                    No items found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

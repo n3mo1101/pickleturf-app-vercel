@@ -1,0 +1,133 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Open play sessions{% endblock %}
+{% load dict_filters %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Open play</h1>
+        <p class="pt-page-subtitle">Join a session or browse past ones</p>
+    </div>
+    <div class="pt-page-actions">
+        {% if is_admin_or_staff %}
+        <a href="{% url 'openplay:admin_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-gear"></i> Manage sessions
+        </a>
+        {% endif %}
+    </div>
+</header>
+
+{# ── Upcoming Sessions ── #}
+<h5 class="mb-3">Upcoming sessions</h5>
+
+{% if upcoming %}
+<div class="row g-3 mb-5">
+    {% for session in upcoming %}
+    {% with status=user_status_map|default_if_none:'' %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">{{ session.title }}</span>
+                {% if session.status == 'full' %}
+                <span class="badge bg-warning">Full</span>
+                {% else %}
+                <span class="badge bg-success">Open</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="mb-1">
+                    <i class="bi bi-calendar3 text-muted"></i>
+                    <strong>{{ session.date|date:"F j, Y" }}</strong>
+                </p>
+                <p class="mb-1">
+                    <i class="bi bi-clock text-muted"></i>
+                    {{ session.start_time|time:"g:i A" }} – {{ session.end_time|time:"g:i A" }}
+                </p>
+                <p class="mb-1">
+                    <i class="bi bi-people text-muted"></i>
+                    {% with approved=session.participants.all %}
+                    {{ session.spots_remaining }} / {{ session.capacity }} spots left
+                    {% endwith %}
+                </p>
+                <p class="mb-0">
+                    <i class="bi bi-cash text-muted"></i>
+                    {% if session.fee > 0 %}
+                        ₱{{ session.fee }}
+                    {% else %}
+                        <span class="text-success">Free</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                {% with user_status=user_status_map|default_if_none:'' %}
+                {% if session.id in user_status_map %}
+                    {% with pstatus=user_status_map|get_item:session.id %}
+                    {% if pstatus == 'approved' %}
+                        <span class="badge bg-success w-100 py-2">
+                            <i class="bi bi-check-circle"></i> Joined
+                        </span>
+                    {% elif pstatus == 'pending' %}
+                        <span class="badge bg-warning w-100 py-2">
+                            <i class="bi bi-hourglass-split"></i> Pending Approval
+                        </span>
+                    {% elif pstatus == 'rejected' %}
+                        <span class="badge bg-danger w-100 py-2">
+                            <i class="bi bi-x-circle"></i> Request Rejected
+                        </span>
+                    {% endif %}
+                    {% endwith %}
+                    <a href="{% url 'openplay:detail' session.pk %}"
+                       class="btn btn-outline-secondary btn-sm w-100 mt-1">
+                        View details
+                    </a>
+                {% else %}
+                    <a href="{% url 'openplay:detail' session.pk %}"
+                       class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right-circle"></i> View &amp; join
+                    </a>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-4">
+    <i class="bi bi-calendar-x" style="font-size:2.5rem;"></i>
+    <p class="mt-2">No upcoming sessions at the moment. Check back soon!</p>
+</div>
+{% endif %}
+
+{# ── Past Sessions ── #}
+{% if past %}
+<h5 class="text-muted mb-3">Past sessions</h5>
+<div class="table-responsive">
+    <table class="table table-sm text-muted table-card-mobile">
+        <thead>
+            <tr>
+                <th>Title</th><th>Date</th><th>Time</th><th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in past %}
+            <tr>
+                <td data-label="Title">{{ s.title }}</td>
+                <td data-label="Date">{{ s.date|date:"M d, Y" }}</td>
+                <td data-label="Time">{{ s.start_time|time:"g:i A" }}</td>
+                <td data-label="Status">
+                    <span class="badge
+                        {% if s.status == 'completed' %}bg-secondary
+                        {% else %}bg-danger{% endif %}">
+                        {{ s.get_status_display }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}

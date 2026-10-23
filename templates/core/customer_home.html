@@ -1,0 +1,215 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+{# ── Greeting Banner ── #}
+<div class="pt-greeting mb-4 fade-in-up">
+    <h3>Hey, {{ user.first_name }}!</h3>
+    <p>
+        {% if upcoming_bookings %}
+            You have {{ upcoming_bookings|length }} upcoming booking(s).
+            See you on the court!
+        {% else %}
+            No upcoming bookings. Ready to reserve a court?
+        {% endif %}
+    </p>
+    <div class="d-flex gap-2 mt-3 flex-wrap">
+        <a href="{% url 'bookings:create' %}"
+           class="btn btn-accent btn-sm fw-bold">
+            <i class="bi bi-calendar-plus me-1"></i> Book a court
+        </a>
+        <a href="{% url 'openplay:list' %}"
+           class="btn btn-outline-secondary btn-sm"
+           style="border-color:rgba(255,255,255,.4);color:#fff;">
+            <i class="bi bi-people me-1"></i> Open Play
+        </a>
+    </div>
+</div>
+
+{# ── Announcements List ── #}
+{% if announcements %}
+<div class="mt-4 fade-in-up">
+    <h5 class="fw-semibold mb-3">
+        Announcements
+    </h5>
+    <div class="d-flex flex-column gap-2">
+        {% for ann in announcements %}
+        <div class="alert alert-{{ ann.level }} mb-0" role="alert">
+            <strong>{{ ann.title }}</strong>
+            {% if ann.body %}
+            <div class="small mt-1">{{ ann.body }}</div>
+            {% endif %}
+            <div class="text-muted" style="font-size:.72rem; margin-top:4px;">
+                {{ ann.created_at|date:"M d, Y" }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<br>
+
+<div class="row g-3">
+
+    {# ── Upcoming Bookings ── #}
+    <div class="col-lg-6 fade-in-up">
+        <div class="card h-100">
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                <span>
+                    Upcoming bookings
+                </span>
+                <a href="{% url 'bookings:my_bookings' %}"
+                   class="btn btn-sm btn-outline-secondary">
+                    View all
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if upcoming_bookings %}
+                <ul class="list-group list-group-flush">
+                    {% for b in upcoming_bookings %}
+                    <li class="list-group-item d-flex
+                                justify-content-between align-items-center py-3">
+                        <div>
+                            <div class="fw-semibold">{{ b.court.name }}</div>
+                            <div class="text-muted small">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                {{ b.date|date:"D, M d" }} ·
+                                {{ b.start_time|time:"g:i A" }} –
+                                {{ b.end_time|time:"g:i A" }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold text-navy">
+                                ₱{{ b.price }}
+                            </div>
+                            {% if b.status == 'confirmed' %}
+                            <span class="badge bg-success">Confirmed</span>
+                            {% elif b.status == 'pending' %}
+                            <span class="badge bg-warning">
+                                Pending
+                            </span>
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-calendar-x" style="font-size:2.5rem;"></i>
+                    <p class="mt-2 mb-3 small">No upcoming bookings.</p>
+                    <a href="{% url 'bookings:create' %}"
+                       class="btn btn-primary btn-sm">
+                        Book a court
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ── Right Column ── #}
+    <div class="col-lg-6">
+        <div class="d-flex flex-column gap-3">
+
+            {# Today's Open Play #}
+            <div class="card fade-in-up">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span>
+                        Today's open play
+                    </span>
+                    <a href="{% url 'openplay:list' %}"
+                       class="btn btn-sm btn-outline-secondary">
+                        All sessions
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if todays_sessions %}
+                    <ul class="list-group list-group-flush">
+                        {% for s in todays_sessions %}
+                        <li class="list-group-item d-flex
+                                    justify-content-between align-items-center py-3">
+                            <div>
+                                <div class="fw-semibold">{{ s.title }}</div>
+                                <div class="text-muted small">
+                                    <i class="bi bi-clock me-1"></i>
+                                    {{ s.start_time|time:"g:i A" }} –
+                                    {{ s.end_time|time:"g:i A" }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="small fw-semibold">
+                                    {{ s.spots_remaining }}/{{ s.capacity }}
+                                    left
+                                </div>
+                                {% if s.status == 'full' %}
+                                <span class="badge bg-warning">
+                                    Full
+                                </span>
+                                {% else %}
+                                <a href="{% url 'openplay:detail' s.pk %}"
+                                   class="badge bg-success text-decoration-none">
+                                    Join
+                                </a>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-people" style="font-size:2rem;"></i>
+                        <p class="mt-2 mb-0 small">
+                            No open play sessions today.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Quick Links #}
+            <div class="card fade-in-up">
+                <div class="card-header fw-semibold">
+                    Quick actions
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{% url 'bookings:availability' %}"
+                               class="btn btn-outline-secondary w-100 text-start">
+                                <i class="bi bi-grid-3x3-gap me-2 text-navy"></i>
+                                View availability
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'bookings:my_bookings' %}"
+                               class="btn btn-outline-secondary w-100 text-start">
+                                <i class="bi bi-journal-check me-2 text-navy"></i>
+                                My bookings
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'openplay:list' %}"
+                               class="btn btn-outline-secondary w-100 text-start">
+                                <i class="bi bi-people me-2 text-navy"></i>
+                                Open play
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'inventory:shop' %}"
+                               class="btn btn-outline-secondary w-100 text-start">
+                                <i class="bi bi-shop me-2 text-navy"></i>
+                                Shop
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

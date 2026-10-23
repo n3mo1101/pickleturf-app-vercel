@@ -1,0 +1,31 @@
+{% extends 'accounts/base_auth.html' %}
+
+{% block auth_title %}Confirm email{% endblock %}
+{% block card_title %}Confirm your email{% endblock %}
+{% block card_subtitle %}Click the button below to verify your account{% endblock %}
+
+{% block auth_content %}
+<div class="text-center py-2">
+    <div style="width:72px;height:72px;background:var(--pt-yellow-pale);
+                border-radius:50%;display:flex;align-items:center;
+                justify-content:center;margin:0 auto 20px;font-size:2rem;">
+        <i class="bi bi-envelope-check-fill text-navy"></i>
+    </div>
+    <p class="text-muted">
+        Please confirm that
+        <strong>{{ confirmation.email_address.email }}</strong>
+        is your email address.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit"
+                class="btn btn-primary w-100 fw-bold mt-2">
+            <i class="bi bi-check-circle me-2"></i>Confirm email
+        </button>
+    </form>
+    <a href="{% url 'account_login' %}"
+       class="btn btn-outline-secondary w-100 mt-2">
+        Cancel
+    </a>
+</div>
+{% endblock %}

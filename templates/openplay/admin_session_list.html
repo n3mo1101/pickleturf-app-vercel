@@ -1,0 +1,120 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Open play{% endblock %}
+{% load dict_filters %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Open play</h1>
+        <p class="pt-page-subtitle">Manage sessions and player requests</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'openplay:admin_create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> New session
+        </a>
+    </div>
+</header>
+
+{# ── Filter ── #}
+<form method="get" class="pt-filters">
+    <select name="status" class="form-select">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>
+            {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Capacity</th>
+                <th>Fee</th>
+                <th>Status</th>
+                <th>Requests</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td data-label="Title" class="fw-semibold">{{ s.title }}</td>
+                <td data-label="Date">{{ s.date|date:"M d, Y" }}</td>
+                <td data-label="Time" class="text-nowrap">
+                    {{ s.start_time|time:"g:i A" }} – {{ s.end_time|time:"g:i A" }}
+                </td>
+                <td data-label="Capacity">
+                    {{ s.spots_remaining }} / {{ s.capacity }}
+                    <div class="progress mt-1" style="height:4px;">
+                        {% widthratio s.participants.count s.capacity 100 as pct %}
+                        <div class="progress-bar" style="width:{{ pct }}%"></div>
+                    </div>
+                </td>
+                <td data-label="Fee">{% if s.fee > 0 %}₱{{ s.fee|floatformat:2 }}{% else %}Free{% endif %}</td>
+                <td data-label="Status">
+                    {% if s.status == 'open' %}
+                        <span class="badge bg-success">Open</span>
+                    {% elif s.status == 'full' %}
+                        <span class="badge bg-warning">Full</span>
+                    {% elif s.status == 'completed' %}
+                        <span class="badge bg-secondary">Completed</span>
+                    {% else %}
+                        <span class="badge bg-danger">Cancelled</span>
+                    {% endif %}
+                </td>
+                <td data-label="Requests">
+                    {% if s.pending_count > 0 %}
+                    <span class="badge bg-warning">
+                        <i class="bi bi-hourglass-split me-1"></i>
+                        {{ s.pending_count }}
+                    </span>
+                    {% else %}
+                    <span class="text-muted small">—</span>
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for {{ s.title }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'openplay:admin_detail' s.pk %}">
+                                    <i class="bi bi-people"></i> Manage
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'openplay:admin_edit' s.pk %}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="bi bi-people"></i>
+                    No sessions found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

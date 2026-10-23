@@ -1,0 +1,97 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Announcements{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Announcements</h1>
+        <p class="pt-page-subtitle">Banners shown across the app</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'announcements:admin_create' %}"
+           class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> New announcement
+        </a>
+    </div>
+</header>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Body</th>
+                <th>Level</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ann in announcements %}
+            <tr {% if not ann.is_active %}class="table-secondary text-muted"{% endif %}>
+                <td data-label="Title" class="fw-semibold">{{ ann.title }}</td>
+                <td data-label="Body" class="small text-muted">
+                    {{ ann.body|truncatechars:60|default:"—" }}
+                </td>
+                <td data-label="Level">
+                    <span class="badge bg-{{ ann.level }}">{{ ann.get_level_display }}</span>
+                </td>
+                <td data-label="Status">
+                    {% if ann.is_active %}
+                    <span class="badge bg-success">Live</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Down</span>
+                    {% endif %}
+                </td>
+                <td data-label="Created" class="small text-muted text-nowrap">
+                    {{ ann.created_at|date:"M d, Y" }}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for {{ ann.title }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'announcements:admin_edit' ann.pk %}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </li>
+                            {% if ann.is_active %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'announcements:admin_takedown' ann.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Take down announcement"
+                                      data-pt-confirm-body="&quot;{{ ann.title|escapejs }}&quot; will stop showing to users."
+                                      data-pt-confirm-label="Take down"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-eye-slash"></i> Take down
+                                    </button>
+                                </form>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="6">
+                    <i class="bi bi-megaphone"></i>
+                    No announcements yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

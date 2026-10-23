@@ -1,0 +1,35 @@
+{
+    "name": "PickleTurf",
+    "short_name": "PickleTurf",
+    "description": "Your premier pickleball facility — book courts, join open play, and gear up.",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#1B2A4A",
+    "theme_color": "#1B2A4A",
+    "icons": [
+        {
+            "src": "/static/img/logo-256.png",
+            "sizes": "256x256",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ],
+    "categories": ["sports", "lifestyle"],
+    "shortcuts": [
+        {
+            "name": "Book a Court",
+            "short_name": "Book",
+            "description": "Reserve a court",
+            "url": "/bookings/new/",
+            "icons": [{ "src": "/static/img/logo-256.png", "sizes": "256x256" }]
+        },
+        {
+            "name": "Open Play",
+            "short_name": "Open Play",
+            "description": "Join open play sessions",
+            "url": "/openplay/",
+            "icons": [{ "src": "/static/img/logo-256.png", "sizes": "256x256" }]
+        }
+    ]
+}

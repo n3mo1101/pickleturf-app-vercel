@@ -1,0 +1,93 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Court availability{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Court availability</h1>
+        <p class="pt-page-subtitle">
+            Showing slots for {{ selected_date|date:"F j, Y" }}
+        </p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'bookings:create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Create booking
+        </a>
+    </div>
+</header>
+
+{# ── Date Picker ── #}
+<form method="get" class="date-toolbar mb-4">
+    <input type="date" id="availability_date" name="date"
+           class="form-control"
+           aria-label="Date"
+           value="{{ selected_date|date:'Y-m-d' }}"
+           min="{{ today }}">
+    <button class="btn btn-primary" type="submit">
+        <i class="bi bi-search"></i> Check
+    </button>
+</form>
+
+{# ── Grid ── #}
+<div class="table-responsive">
+    <table class="table table-bordered text-center align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th style="min-width:180px;">Time slot</th>
+                {% for slot_label, slot_data in grid.items %}
+                    {% if forloop.first %}
+                        {% for court in slot_data.courts %}
+                            <th>{{ court.name }}</th>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for slot_label, slot_data in grid.items %}
+            <tr {% if slot_data.past %}class="slot-row-past"{% endif %}>
+                <td class="fw-semibold text-nowrap">
+                    {{ slot_label }}
+                    <div class="text-ok small fw-semibold">
+                        ₱{{ slot_data.price }}/hr
+                    </div>
+                </td>
+                {% for court, status in slot_data.courts.items %}
+                <td data-label="{{ court.name }}">
+                    {% if status == 'past' %}
+                        <span class="slot-pill slot-pill--unavailable">
+                            Unavailable
+                        </span>
+                    {% elif status == 'booked' %}
+                        <span class="slot-pill slot-pill--reserved">
+                            Reserved
+                        </span>
+                    {% else %}
+                        <a href="{% url 'bookings:create' %}?court={{ court.id }}&date={{ selected_date|date:'Y-m-d' }}&time={{ slot_label|slice:':8' }}"
+                           class="slot-pill slot-pill--available">
+                            Available
+                        </a>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex flex-wrap gap-4 mt-3 small text-muted">
+    <span class="d-inline-flex align-items-center gap-2">
+        <span class="slot-pill slot-pill--available">Available</span>
+        Click to book
+    </span>
+    <span class="d-inline-flex align-items-center gap-2">
+        <span class="slot-pill slot-pill--reserved">Reserved</span>
+        Slot taken
+    </span>
+    <span class="d-inline-flex align-items-center gap-2">
+        <span class="slot-pill slot-pill--unavailable">Unavailable</span>
+        Time already passed
+    </span>
+</div>
+{% endblock %}

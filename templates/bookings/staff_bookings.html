@@ -1,0 +1,153 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Staff bookings{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Staff bookings</h1>
+        <p class="pt-page-subtitle">Reservations created at the front desk</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'bookings:admin_list' %}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-table"></i> All bookings
+        </a>
+        <a href="{% url 'bookings:admin_create' %}"
+           class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Create booking
+        </a>
+    </div>
+</header>
+
+{% if bookings %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 table-card-mobile">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Customer</th>
+                    <th>Court</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in bookings %}
+                <tr>
+                    <td data-label="#" class="text-muted small">{{ b.id }}</td>
+                    <td data-label="Customer">
+                        <div class="fw-semibold small">
+                            {{ b.user.full_name }}
+                        </div>
+                        <div class="text-muted" style="font-size:.75rem;">
+                            {{ b.user.email }}
+                        </div>
+                    </td>
+                    <td data-label="Court">{{ b.court.name }}</td>
+                    <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
+                    <td data-label="Time" class="text-nowrap">
+                        {{ b.start_time|time:"g:i A" }} – {{ b.end_time|time:"g:i A" }}
+                    </td>
+                    <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
+                    <td data-label="Status">
+                        {% if b.status == 'confirmed' %}
+                        <span class="badge bg-success">Confirmed</span>
+                        {% elif b.status == 'pending' %}
+                        <span class="badge bg-warning">Pending</span>
+                        {% elif b.status == 'cancelled' %}
+                        <span class="badge bg-danger">Cancelled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">
+                            {{ b.get_status_display }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="td-actions">
+                        <div class="dropdown">
+                            <button class="btn btn-icon" type="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                    aria-label="Actions for booking #{{ b.id }}">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'bookings:admin_status' b.pk %}">
+                                        <i class="bi bi-pencil"></i> Update status
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ── Pagination ── #}
+{% if bookings.has_other_pages %}
+<nav class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% if bookings.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ bookings.previous_page_number }}">
+                &laquo; Prev
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo; Prev</span>
+        </li>
+        {% endif %}
+        {% for num in bookings.paginator.page_range %}
+            {% if bookings.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > bookings.number|add:'-3' and num < bookings.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        {% if bookings.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ bookings.next_page_number }}">
+                Next &raquo;
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Next &raquo;</span>
+        </li>
+        {% endif %}
+    </ul>
+    <p class="text-center text-muted small mb-0">
+        Page {{ bookings.number }} of {{ bookings.paginator.num_pages }}
+    </p>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="card">
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.5;"></i>
+        <p class="mt-3 mb-3">No bookings created yet.</p>
+        <a href="{% url 'bookings:admin_create' %}"
+           class="btn btn-primary">
+            Create a booking
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

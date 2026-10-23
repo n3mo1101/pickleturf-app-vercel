@@ -1,0 +1,57 @@
+<div class="pt-fab-wrap" id="ptFAB">
+
+    {# ── Action Buttons ── #}
+    <div class="pt-fab-actions">
+
+        {% if is_admin_or_staff %}
+
+        <a href="{% url 'inventory:admin_rental_pos' %}"
+           class="pt-fab-action">
+            <i class="bi bi-clock-history"></i>
+            Rent
+        </a>
+        <a href="{% url 'inventory:admin_pos' %}"
+           class="pt-fab-action">
+            <i class="bi bi-cart3"></i>
+            Purchase
+        </a>
+        <a href="{% url 'openplay:admin_list' %}"
+           class="pt-fab-action">
+            <i class="bi bi-people-fill"></i>
+            Open play
+        </a>
+        <a href="{% url 'bookings:admin_create' %}"
+           class="pt-fab-action">
+            <i class="bi bi-calendar-plus"></i>
+            Book court
+        </a>
+
+        {% else %}
+
+        <a href="{% url 'inventory:shop' %}"
+           class="pt-fab-action">
+            <i class="bi bi-shop"></i>
+            Shop
+        </a>
+        <a href="{% url 'openplay:list' %}"
+           class="pt-fab-action">
+            <i class="bi bi-people-fill"></i>
+            Open play
+        </a>
+        <a href="{% url 'bookings:create' %}"
+           class="pt-fab-action">
+            <i class="bi bi-calendar-plus"></i>
+            Book court
+        </a>
+
+        {% endif %}
+
+    </div>
+
+    {# ── Main FAB Button ── #}
+    <button class="pt-fab-main" onclick="toggleFAB()"
+            aria-label="Quick actions">
+        <i class="bi bi-plus-lg"></i>
+    </button>
+
+</div>

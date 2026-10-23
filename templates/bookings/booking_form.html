@@ -1,0 +1,261 @@
+{% extends 'layouts/base.html' %}
+{% load crispy_forms_tags %}
+{% load dict_filters %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-3">
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header fw-semibold">
+                {{ title }}
+            </div>
+            <div class="card-body p-4">
+
+                {# ── Price Brackets ── #}
+                <div class="mb-4">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for bracket in brackets %}
+                        <div class="card border-0 bg-light px-3 py-2 d-flex flex-row
+                                    align-items-center gap-2">
+                            <i class="bi bi-clock text-warning"></i>
+                            <div>
+                                <div class="small fw-semibold">{{ bracket.label }}</div>
+                                <div class="text-success fw-bold small">
+                                    ₱{{ bracket.rate }}/hr
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="alert alert-info mt-2 mb-0 py-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Price varies by time slot. Choose your payment method below.
+                    </div>
+                </div>
+
+                {# ── PHASE 1: Court + Date picker ── #}
+                <form method="get" class="mb-4" id="slot-loader-form">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Court</label>
+                            {{ form.court }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Date</label>
+                            {{ form.date }}
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-outline-success w-100">
+                                <i class="bi bi-search"></i> Show Slots
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {# ── PHASE 2: Slot checkboxes + booking submission ── #}
+                {% if slots_available is not None %}
+                    {% if slots_available %}
+                    <hr>
+                    <form method="post" id="booking-form">
+                        {% csrf_token %}
+
+                        {# Hidden fields carry court + date into POST #}
+                        <input type="hidden" name="court" value="{{ form.court.value }}">
+                        <input type="hidden" name="date"  value="{{ selected_date|date:'Y-m-d' }}">
+
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-clock"></i>
+                            Available Slots for {{ court.name }}
+                            on {{ selected_date|date:"F j, Y" }}
+                        </h6>
+
+                        <div class="row g-2 mb-3" id="slot-checkboxes">
+                            {% for value, label in slots_available %}
+                            <div class="col-md-6">
+                                <div class="form-check slot-card border rounded p-3">
+                                    <input
+                                        class="form-check-input slot-checkbox"
+                                        type="checkbox"
+                                        name="time_slots"
+                                        value="{{ value }}"
+                                        id="slot_{{ forloop.counter }}"
+                                        data-price="{{ value|get_slot_price }}"
+                                    >
+                                    <label class="form-check-label fw-semibold w-100"
+                                        for="slot_{{ forloop.counter }}">
+                                        <i class="bi bi-clock me-1 text-success"></i>
+                                        {{ label }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        {# ── Live price summary ── #}
+                        <div class="card bg-light border-0 mb-3" id="price-summary"
+                             style="display:none !important;">
+                            <div class="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="text-muted">Duration:</span>
+                                    <strong id="total-hours">0</strong> hour(s)
+                                </div>
+                                <div class="fs-5 fw-bold text-success">
+                                    Total: ₱<span id="total-price-amount">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# Notes #}
+                        <div class="mb-3">
+                            <label class="form-label">Notes (optional)</label>
+                            {{ form.notes }}
+                        </div>
+
+                        {# ── Payment Method ── #}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-credit-card"></i> Payment Method
+                            </label>
+                            {% if is_admin %}
+                            {# Walk-in: always pay on-site, hide online completely #}
+                            <div class="d-flex flex-column gap-2" id="payment-method-group">
+                                <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
+                                    <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold"><i class="bi bi-shop text-success"></i>On-site</div>
+                                        <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
+                                    </div>
+                                    <span class="badge bg-success">Cash</span>
+                                </label>
+                            </div>
+                            {% elif payments_enabled %}
+                            <div class="d-flex flex-column gap-2" id="payment-method-group">
+                                <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
+                                    <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold"><i class="bi bi-shop text-success"></i> Pay on-site</div>
+                                        <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
+                                    </div>
+                                    <span class="badge bg-success">On-site</span>
+                                </label>
+                                <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
+                                    <input type="radio" name="payment_method" value="online" class="form-check-input m-0 payment-radio">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold"><i class="bi bi-phone text-primary"></i> Pay online <small class="text-muted">(GCash / Card)</small></div>
+                                        <small class="text-muted">Reserve now, pay via PayMongo. Confirmed after payment.</small>
+                                    </div>
+                                    <span class="badge bg-primary">Pay Now</span>
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-1">You’ll be redirected to checkout if you choose online.</small>
+                            {% else %}
+                            <div class="alert alert-secondary py-2 mb-0">
+                                <i class="bi bi-shop"></i> <strong>Pay on-site only</strong> · online payments are currently unavailable.
+                                <input type="hidden" name="payment_method" value="onsite">
+                            </div>
+                            {% endif %}
+                            {% if form.payment_method.errors %}
+                                <div class="text-danger small mt-1">{{ form.payment_method.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg"
+                                    id="submit-btn" disabled>
+                                <i class="bi bi-check-circle"></i>
+                                Confirm booking
+                            </button>
+                            <a href="{% url 'bookings:availability' %}"
+                               class="btn btn-outline-secondary">
+                                Back to availability
+                            </a>
+                        </div>
+                    </form>
+
+                    {% else %}
+                    <hr>
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-calendar-x" style="font-size:2.5rem;"></i>
+                        <p class="mt-2">
+                            No available slots for <strong>{{ court.name }}</strong>
+                            on <strong>{{ selected_date|date:"F j, Y" }}</strong>.
+                        </p>
+                        <a href="{% url 'bookings:availability' %}"
+                           class="btn btn-outline-secondary btn-sm">
+                            View Full Grid
+                        </a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                <p class="text-muted text-center mt-3">
+                    <i class="bi bi-arrow-up-circle"></i>
+                    Select a court and date above to see available time slots.
+                </p>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const checkboxes  = document.querySelectorAll('.slot-checkbox');
+    const summary     = document.getElementById('price-summary');
+    const totalHours  = document.getElementById('total-hours');
+    const totalPrice_el  = document.getElementById('total-price-amount');
+    const submitBtn   = document.getElementById('submit-btn');
+    const paymentRadios = document.querySelectorAll('.payment-radio');
+    const paymentOptions = document.querySelectorAll('.payment-option');
+
+    function updatePaymentHighlight() {
+        paymentOptions.forEach(opt => {
+            const radio = opt.querySelector('.payment-radio');
+            opt.classList.toggle('border-success', radio && radio.checked);
+            opt.classList.toggle('bg-success', radio && radio.checked);
+            opt.classList.toggle('bg-opacity-10', radio && radio.checked);
+        });
+    }
+
+    function updateSummary() {
+        const checked  = document.querySelectorAll('.slot-checkbox:checked');
+        const count    = checked.length;
+
+        if (count > 0) {
+            // Sum prices from each checked slot's data-price
+            let totalPrice = 0;
+            checked.forEach(cb => {
+                totalPrice += parseInt(cb.dataset.price || 0);
+            });
+
+            totalHours.textContent = count;
+            totalPrice_el.textContent = totalPrice.toLocaleString();
+            summary.style.removeProperty('display');
+            submitBtn.disabled = false;
+        } else {
+            summary.style.setProperty('display', 'none', 'important');
+            submitBtn.disabled = true;
+        }
+    }
+
+    // Highlight card when checkbox is checked
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            cb.closest('.slot-card').classList.toggle('border-success', cb.checked);
+            cb.closest('.slot-card').classList.toggle('bg-success',     cb.checked);
+            cb.closest('.slot-card').classList.toggle('bg-opacity-10',  cb.checked);
+            updateSummary();
+        });
+    });
+
+    paymentRadios.forEach(r => {
+        r.addEventListener('change', () => {
+            updatePaymentHighlight();
+            updateSummary();
+        });
+    });
+    updatePaymentHighlight();
+</script>
+{% endblock %}

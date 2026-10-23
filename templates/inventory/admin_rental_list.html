@@ -1,0 +1,114 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Rental records{% endblock %}
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Rental records</h1>
+        <p class="pt-page-subtitle">Equipment currently out on rent</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'inventory:admin_rental_pos' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Rent counter
+        </a>
+    </div>
+</header>
+
+<form method="get" class="pt-filters">
+    <input type="search" name="q" class="form-control"
+           placeholder="Search by renter name, contact, or item..."
+           value="{{ search_query }}">
+    <select name="status" class="form-select">
+        <option value="">Active</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}"
+            {% if status_filter == val %}selected{% endif %}>
+            {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+    <a href="{% url 'inventory:admin_rental_list' %}"
+       class="btn btn-outline-secondary">
+        <i class="bi bi-eraser"></i> Clear
+    </a>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Renter</th>
+                <th>Contact</th>
+                <th>Rented At</th>
+                <th>Qty</th>
+                <th>Cost</th>
+                <th>Status</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rentals %}
+            <tr>
+                <td data-label="#" class="text-muted small">{{ r.pk }}</td>
+                <td data-label="Item" class="fw-semibold">{{ r.item.name }}</td>
+                <td data-label="Renter">{{ r.renter_name }}</td>
+                <td data-label="Contact" class="text-muted small">{{ r.renter_contact|default:"—" }}</td>
+                <td data-label="Rented At">{{ r.rented_at|date:"M d, Y g:i A" }}</td>
+                <td data-label="Qty">{{ r.quantity }}</td>
+                <td data-label="Cost">₱{{ r.total_cost|floatformat:2 }}</td>
+                <td data-label="Status">
+                    {% if r.status == 'active' %}
+                    <span class="badge bg-warning">Active</span>
+                    {% elif r.status == 'returned' %}
+                    <span class="badge bg-success">Returned</span>
+                    {% else %}
+                    <span class="badge bg-danger">Overdue</span>
+                    {% endif %}
+                </td>
+                {% if r.status == 'active' %}
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for rental #{{ r.pk }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post"
+                                      action="{% url 'inventory:admin_return' r.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Mark as returned"
+                                      data-pt-confirm-body="Stock for &quot;{{ r.item.name|escapejs }}&quot; will be restored and the rental closed."
+                                      data-pt-confirm-label="Mark returned"
+                                      data-pt-confirm-class="btn-primary">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-arrow-return-left"></i> Mark returned
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+                {% else %}
+                <td class="td-actions"></td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="9">
+                    <i class="bi bi-arrow-return-left"></i>
+                    No rental records found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,334 @@
+{% extends 'layouts/base.html' %}
+{% load static dict_filters %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+{# ── Page Header ── #}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Dashboard</h1>
+        <p class="pt-page-subtitle">{{ today|date:"l, F j, Y" }}</p>
+    </div>
+    <div class="pt-page-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#ptExportModal"
+                data-export-url="{% url 'dashboard:export_csv' %}">
+            <i class="bi bi-download"></i> Export CSV
+        </button>
+    </div>
+</header>
+
+{# ── KPI Hierarchy ── #}
+<div class="kpi-grid">
+
+    <div class="card kpi-hero">
+        <i class="bi bi-graph-up kpi-hero-ghost"></i>
+        <div class="kpi-hero-top">
+            <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+            <div class="kpi-label">Today's revenue</div>
+        </div>
+        <div class="kpi-value">₱{{ today_revenue|floatformat:2 }}</div>
+        {% if last_tx_label %}
+        <div class="kpi-sub"><i class="bi bi-arrow-up-right"></i> +₱{{ last_tx_amount|floatformat:2 }} from {{ last_tx_label }}</div>
+        {% endif %}
+        <div class="kpi-hero-split">
+            <div class="kpi-split-item">
+                <div class="kpi-split-label">Bookings &amp; Open Play</div>
+                <div class="kpi-split-value">₱{{ split_bookings|floatformat:2 }}</div>
+            </div>
+            <div class="kpi-split-item">
+                <div class="kpi-split-label">Products</div>
+                <div class="kpi-split-value">₱{{ split_products|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-stack">
+        <div class="card kpi-row">
+            <div class="kpi-row-head">
+                <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+                <div class="kpi-label">This month</div>
+            </div>
+            <div class="kpi-meta">
+                <div class="kpi-value">₱{{ month_revenue|floatformat:2 }}</div>
+                <div class="kpi-note">{{ today|date:"F Y" }}</div>
+            </div>
+        </div>
+        <div class="card kpi-row">
+            <div class="kpi-row-head">
+                <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
+                <div class="kpi-label">Bookings today</div>
+            </div>
+            <div class="kpi-meta">
+                <div class="kpi-value">{{ bookings_today }}</div>
+                <div class="kpi-note">Confirmed + completed</div>
+            </div>
+        </div>
+        <div class="card kpi-row">
+            <div class="kpi-row-head">
+                <div class="kpi-icon"><i class="bi bi-clock-history"></i></div>
+                <div class="kpi-label">Active rentals</div>
+            </div>
+            <div class="kpi-meta">
+                <div class="kpi-value">{{ active_rentals }}</div>
+                <div class="kpi-note">Currently out</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── Row 1: Today's Bookings + Recent Transactions ── #}
+<div class="row g-3 mb-3">
+
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Today's bookings</span>
+                <span class="badge bg-primary">{{ bookings_today }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if todays_bookings %}
+                <ul class="list-group list-group-flush">
+                    {% for b in todays_bookings %}
+                    <li class="list-group-item py-2 px-3">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold small">
+                                    {{ b.court.name }}
+                                </div>
+                                <div class="text-muted" style="font-size:.75rem;">
+                                    {{ b.user.full_name }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="small">
+                                    {{ b.start_time|time:"g:i A" }}
+                                </div>
+                                <div class="text-ok fw-semibold"
+                                     style="font-size:.75rem;">
+                                    ₱{{ b.price|floatformat:2 }}
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x fs-3"></i>
+                    <p class="small mt-2 mb-0">No bookings today.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer border-0 text-end">
+                <a href="{% url 'bookings:admin_list' %}"
+                   class="btn btn-sm btn-outline-secondary">
+                    View all
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Recent transactions</span>
+                <a href="{% url 'transactions:list' %}"
+                   class="btn btn-sm btn-outline-secondary">
+                    View all
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle table-card-mobile">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in recent_transactions %}
+                            <tr>
+                                <td data-label="#">
+                                    {{ tx.pk }}
+                                </td>
+                                <td data-label="Type">
+                                    {% if tx.tx_type == 'booking' %}
+                                    <span class="badge bg-success">Booking</span>
+                                    {% elif tx.tx_type == 'sale' %}
+                                    <span class="badge bg-primary">Sale</span>
+                                    {% elif tx.tx_type == 'rental' %}
+                                    <span class="badge bg-warning">Rental</span>
+                                    {% elif tx.tx_type == 'openplay' %}
+                                    <span class="badge bg-info">Open Play</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td data-label="Description"
+                                    class="small description-cell"
+                                    title="{{ tx.description|tx_desc }}">
+                                    {{ tx.description|tx_desc|truncatechars:45 }}
+                                </td>
+                                <td data-label="Amount"
+                                    class="fw-semibold text-ok small">
+                                    ₱{{ tx.amount|floatformat:2 }}
+                                </td>
+                                <td data-label="Status">
+                                    {% if tx.payment_status == 'paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                    {% elif tx.payment_status == 'pending' %}
+                                    <span class="badge bg-warning">Pending</span>
+                                    {% elif tx.payment_status == 'refunded' %}
+                                    <span class="badge bg-danger">Refunded</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Waived</span>
+                                    {% endif %}
+                                </td>
+                                <td data-label="Date"
+                                    class="text-muted small text-nowrap">
+                                    {{ tx.created_at|date:"M d, g:i A" }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr class="empty-state">
+                                <td colspan="6">
+                                    <i class="bi bi-cash-stack"></i>
+                                    No transactions yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── Row 2: Daily Revenue + Upcoming Open Play ── #}
+<div class="row g-3 mb-3">
+
+    <div class="col-lg-9">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Daily revenue</span>
+                <div class="btn-group btn-group-sm btn-range" role="group"
+                     aria-label="Daily revenue range">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-range="7">7D</button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-range="14">14D</button>
+                    <button type="button" class="btn btn-outline-secondary active"
+                            data-range="30">30D</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyRevenueChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Upcoming open play</span>
+                <span class="badge bg-primary">{{ upcoming_sessions|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if upcoming_sessions %}
+                <ul class="list-group list-group-flush">
+                    {% for s in upcoming_sessions %}
+                    <li class="list-group-item py-2 px-3">
+                        <div class="fw-semibold small">{{ s.title }}</div>
+                        <div class="text-muted" style="font-size:.75rem;">
+                            {{ s.date|date:"M d" }} ·
+                            {{ s.start_time|time:"g:i A" }}
+                        </div>
+                        <div class="mt-1">
+                            <div class="progress" style="height:4px;">
+                                {% widthratio s.participants.count s.capacity 100 as pct %}
+                                <div class="progress-bar" style="width:{{ pct }}%"></div>
+                            </div>
+                            <div class="text-muted mt-1" style="font-size:.7rem;">
+                                {{ s.spots_remaining }}/{{ s.capacity }} spots left
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x fs-3"></i>
+                    <p class="small mt-2 mb-0">No upcoming sessions.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer border-0 text-end">
+                <a href="{% url 'openplay:admin_list' %}"
+                   class="btn btn-sm btn-outline-secondary">
+                    Manage
+                </a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── Row 3: Monthly Revenue + Revenue by Type ── #}
+<div class="row g-3">
+
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Monthly revenue</span>
+                <span class="text-muted small fw-normal">{{ today|date:"Y" }}</span>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyRevenueChart" height="160"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">Revenue by type</div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                {% if type_data %}
+                <canvas id="revenueTypeChart"></canvas>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-bar-chart-line fs-2"></i>
+                    <p class="mt-2 small mb-0">No transactions yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Data injected from Django
+const dailyLabels   = {{ daily_labels|safe }};
+const dailyData     = {{ daily_data|safe }};
+const monthlyLabels = {{ monthly_labels|safe }};
+const monthlyData   = {{ monthly_data|safe }};
+const typeLabels    = {{ type_labels|safe }};
+const typeData      = {{ type_data|safe }};
+</script>
+<script src="{% static 'js/dashboard.js' %}"></script>
+{% endblock %}

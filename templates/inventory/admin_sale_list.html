@@ -1,0 +1,75 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Sale history{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Sale history</h1>
+        <p class="pt-page-subtitle">Recorded point-of-sale transactions</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'inventory:admin_pos' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Sale counter
+        </a>
+    </div>
+</header>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>By</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td data-label="#" class="text-muted">{{ sale.pk }}</td>
+                <td data-label="Date">{{ sale.created_at|date:"M d, Y g:i A" }}</td>
+                <td data-label="Items">
+                    {% for si in sale.items.all %}
+                    <span class="badge bg-secondary me-1">
+                        {{ si.item.name }} ×{{ si.quantity }}
+                    </span>
+                    {% endfor %}
+                </td>
+                <td data-label="Total" class="fw-bold text-ok">₱{{ sale.total|floatformat:2 }}</td>
+                <td data-label="By" class="small text-muted">
+                    {{ sale.created_by.full_name|default:"—" }}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for sale #{{ sale.pk }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'inventory:admin_sale_detail' sale.pk %}">
+                                    <i class="bi bi-eye"></i> View details
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="6">
+                    <i class="bi bi-receipt"></i>
+                    No sales recorded yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

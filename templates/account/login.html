@@ -1,0 +1,43 @@
+{% extends 'accounts/base_auth.html' %}
+{% load crispy_forms_tags socialaccount %}
+
+{% block auth_title %}Sign in{% endblock %}
+{% block card_title %}Welcome back{% endblock %}
+{% block card_subtitle %}Sign in with your email or username{% endblock %}
+
+{% block auth_content %}
+<form method="post">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{% url 'account_reset_password' %}" class="small text-muted">
+            Forgot password?
+        </a>
+    </div>
+    <div class="d-grid">
+        <button class="btn btn-primary btn-lg fw-bold" type="submit">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Sign in
+        </button>
+    </div>
+</form>
+
+<div class="auth-divider">or continue with</div>
+
+<div class="d-flex gap-2">
+    <a href="{% provider_login_url 'google' %}"
+       class="btn btn-google flex-fill">
+        <i class="bi bi-google me-2"></i>Google
+    </a>
+    <a href="#"
+       class="btn btn-facebook flex-fill">
+        <i class="bi bi-facebook me-2"></i>Facebook
+    </a>
+</div>
+
+<p class="text-center mt-4 mb-0 small text-muted">
+    Don't have an account?
+    <a href="{% url 'account_signup' %}" class="fw-semibold text-navy">
+        Create account
+    </a>
+</p>
+{% endblock %}

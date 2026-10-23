@@ -1,0 +1,98 @@
+{# The entire template — replace fully: #}
+{% extends 'layouts/base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-3">
+    <div class="col-md-7">
+
+        {# ── Edit/Create Form ── #}
+        <div class="card shadow-sm border-0">
+            <div class="card-header fw-semibold">
+                {{ title }}
+            </div>
+            <div class="card-body p-4">
+
+                {# Live preview #}
+                <div id="preview-box" class="alert alert-info mb-3"
+                     style="display:none;">
+                    <strong id="preview-title"></strong>
+                    <span id="preview-body"></span>
+                </div>
+
+                {# Main form — NO delete button inside here #}
+                <form method="post" id="editForm">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            {% if announcement %}
+                                Save changes
+                            {% else %}
+                                Publish announcement
+                            {% endif %}
+                        </button>
+                        <a href="{% url 'announcements:admin_list' %}"
+                           class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            {% if announcement %}
+            <div class="mt-3">
+                <form method="post"
+                    action="{% url 'announcements:admin_delete' announcement.pk %}"
+                    id="deleteForm"
+                    data-pt-confirm
+                    data-pt-confirm-title="Delete announcement"
+                    data-pt-confirm-body="Permanently delete &quot;{{ announcement.title|escapejs }}&quot;? This cannot be undone."
+                    data-pt-confirm-label="Delete"
+                    data-pt-confirm-class="btn-danger">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="btn btn-outline-danger w-100">
+                        <i class="bi bi-trash me-1"></i>
+                        Delete
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const titleInput = document.getElementById('id_title');
+    const bodyInput  = document.getElementById('id_body');
+    const levelInput = document.getElementById('id_level');
+    const previewBox   = document.getElementById('preview-box');
+    const previewTitle = document.getElementById('preview-title');
+    const previewBody  = document.getElementById('preview-body');
+
+    function updatePreview() {
+        const t = titleInput?.value.trim();
+        const b = bodyInput?.value.trim();
+        const l = levelInput?.value;
+        if (t) {
+            previewBox.style.display = '';
+            previewBox.className = `alert alert-${l} mb-3`;
+            previewTitle.textContent = t;
+            previewBody.textContent  = b ? ` · ${b}` : '';
+        } else {
+            previewBox.style.display = 'none';
+        }
+    }
+
+    titleInput?.addEventListener('input', updatePreview);
+    bodyInput?.addEventListener('input', updatePreview);
+    levelInput?.addEventListener('change', updatePreview);
+    updatePreview();
+</script>
+{% endblock %}

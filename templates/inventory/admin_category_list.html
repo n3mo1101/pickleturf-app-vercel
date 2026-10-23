@@ -1,0 +1,63 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Categories</h1>
+        <p class="pt-page-subtitle">Organize inventory items</p>
+    </div>
+    <div class="pt-page-actions">
+        <a href="{% url 'inventory:admin_category_create' %}"
+           class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Add category
+        </a>
+    </div>
+</header>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Items</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td data-label="Name" class="fw-semibold">{{ cat.name }}</td>
+                <td data-label="Description" class="text-muted">{{ cat.description|default:"—" }}</td>
+                <td data-label="Items">{{ cat.items.count }}</td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for {{ cat.name }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'inventory:admin_category_edit' cat.pk %}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="4">
+                    <i class="bi bi-tags"></i>
+                    No categories yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Payment {% if outcome == 'success' %}successful{% else %}cancelled{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm text-center">
+            <div class="card-body p-5">
+                {% if outcome == 'success' %}
+                    {% if transaction.payment_status == 'paid' %}
+                    <div class="display-4 text-success mb-3">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <h4 class="fw-semibold mb-2">Payment successful</h4>
+                    <p class="text-muted mb-4">
+                        Your payment of <strong>₱{{ transaction.amount }}</strong>
+                        has been received{% if transaction.paid_at %} on
+                        {{ transaction.paid_at|date:"M d, Y g:i A" }}{% endif %}.
+                    </p>
+                    {% else %}
+                    <div class="display-4 text-warning mb-3">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                    <h4 class="fw-semibold mb-2">Payment pending</h4>
+                    <p class="text-muted mb-4">
+                        We received your payment and are confirming it.
+                        This usually takes a few seconds. Check your bookings shortly.
+                    </p>
+                    {% endif %}
+
+                    {% if transaction.booking %}
+                    <a href="{% url 'bookings:my_bookings' %}"
+                       class="btn btn-primary">
+                        <i class="bi bi-journal-check"></i> My bookings
+                    </a>
+                    {% elif transaction.openplay %}
+                    <a href="{% url 'openplay:detail' transaction.openplay.session_id %}"
+                       class="btn btn-primary">
+                        <i class="bi bi-people-fill"></i> View session
+                    </a>
+                    {% endif %}
+
+                {% else %}
+                    <div class="display-4 text-secondary mb-3">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <h4 class="fw-semibold mb-2">Payment cancelled</h4>
+                    <p class="text-muted mb-4">
+                        No charge was made. You can try again whenever you're ready.
+                    </p>
+                    {% if transaction.booking %}
+                    <a href="{% url 'bookings:my_bookings' %}"
+                       class="btn btn-outline-secondary">
+                        Back to my bookings
+                    </a>
+                    {% elif transaction.openplay %}
+                    <a href="{% url 'openplay:detail' transaction.openplay.session_id %}"
+                       class="btn btn-outline-secondary">
+                        Back to session
+                    </a>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

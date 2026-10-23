@@ -1,0 +1,41 @@
+{% extends 'accounts/base_auth.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block auth_title %}Complete sign in{% endblock %}
+{% block card_title %}Complete sign in{% endblock %}
+{% block card_subtitle %}You're signing in via {{ sociallogin.account.get_provider.name }}{% endblock %}
+
+{% block auth_content %}
+<div class="text-center mb-4">
+    <div style="width:64px;height:64px;background:var(--pt-yellow-pale);
+                border-radius:50%;display:flex;align-items:center;
+                justify-content:center;margin:0 auto 16px;font-size:1.8rem;">
+        <i class="bi bi-person-check-fill text-navy"></i>
+    </div>
+    <p class="text-muted small">
+        You are about to sign in using your
+        <strong>{{ sociallogin.account.get_provider.name }}</strong> account.
+        {% if sociallogin.account.extra_data.email %}
+        <br>
+        <span class="text-muted">{{ sociallogin.account.extra_data.email }}</span>
+        {% endif %}
+    </p>
+</div>
+
+<form method="post" action="{% url 'socialaccount_signup' %}">
+    {% csrf_token %}
+    {% if form.errors %}
+        {{ form|crispy }}
+    {% endif %}
+    <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary btn-lg fw-bold">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Continue
+        </button>
+        <a href="{% url 'account_login' %}"
+           class="btn btn-outline-secondary">
+            Cancel
+        </a>
+    </div>
+</form>
+{% endblock %}

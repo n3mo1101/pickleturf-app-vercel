@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["python312", "python312Packages.pip", "postgresql"]
+
+[phases.install]
+cmds = [
+    "python -m venv /opt/venv",
+    "/opt/venv/bin/pip install -r requirements.txt",
+]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = [
+    "/opt/venv/bin/python manage.py collectstatic --noinput",
+]
+
+[start]
+cmd = "/opt/venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"

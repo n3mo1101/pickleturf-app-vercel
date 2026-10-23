@@ -1,0 +1,105 @@
+{% extends 'layouts/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}My profile{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9 col-xl-8">
+
+        {# ── Identity ── #}
+        <div class="card mb-4">
+            <div class="profile-cover"></div>
+            <div class="profile-head">
+                <div class="profile-avatar">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="{{ user.full_name }}">
+                    {% else %}
+                        {{ user.first_name|first|upper }}
+                    {% endif %}
+                </div>
+                <div class="profile-id">
+                    <h2 class="profile-name">{{ user.full_name }}</h2>
+                    <div class="profile-meta">
+                        <span><i class="bi bi-envelope"></i>{{ user.email }}</span>
+                    </div>
+                </div>
+                <div class="profile-actions">
+                    <span class="badge bg-primary">{{ user.get_role_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        {# ── Stats ── #}
+        <div class="stat-tiles mb-4">
+            <div class="card stat-tile">
+                <div class="stat-tile-label">Bookings</div>
+                <div class="stat-tile-value">{{ stats.total_bookings }}</div>
+                <div class="stat-tile-note">All time</div>
+            </div>
+            <div class="card stat-tile">
+                <div class="stat-tile-label">Total spent</div>
+                <div class="stat-tile-value">₱{{ stats.total_spent|floatformat:2 }}</div>
+                <div class="stat-tile-note">Confirmed + completed</div>
+            </div>
+            <div class="card stat-tile">
+                <div class="stat-tile-label">Courts played</div>
+                <div class="stat-tile-value">{{ stats.courts_played }}</div>
+                <div class="stat-tile-note">Distinct courts</div>
+            </div>
+            <div class="card stat-tile">
+                <div class="stat-tile-label">Member since</div>
+                <div class="stat-tile-value">{{ user.date_joined|date:"M Y" }}</div>
+            </div>
+        </div>
+
+        {# ── Personal information ── #}
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">Personal information</div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-end mt-3">
+                        <button class="btn btn-primary" type="submit">
+                            Save changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {# ── Account & security ── #}
+        <div class="card mb-4">
+            <div class="card-header fw-semibold">Account &amp; security</div>
+            <div class="card-body">
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <div class="settings-row-title">Password</div>
+                        <div class="settings-row-sub">
+                            Update your account password
+                        </div>
+                    </div>
+                    <a href="{% url 'account_change_password' %}"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-lock"></i> Change password
+                    </a>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <div class="settings-row-title">Appearance</div>
+                        <div class="settings-row-sub">
+                            Switch between light and dark theme
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            id="profileThemeBtn" onclick="toggleTheme()">
+                        <i class="bi bi-moon-fill"></i> Dark mode
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

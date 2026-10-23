@@ -1,0 +1,57 @@
+{% comment %}
+Reusable export modal. Trigger buttons open it via Bootstrap data attributes:
+
+    data-bs-toggle="modal" data-bs-target="#ptExportModal"
+    data-export-url   (export endpoint — required)
+    data-export-type  (preselect: transactions, daily, monthly — optional)
+{% endcomment %}
+<div class="modal fade" id="ptExportModal" tabindex="-1"
+     aria-labelledby="ptExportTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ptExportTitle">Export CSV</h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="ptExportForm" novalidate>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="ptExportType" class="form-label">Type</label>
+                        <select id="ptExportType" name="type" class="form-select">
+                            <option value="transactions">Transactions</option>
+                            <option value="daily">Daily revenue</option>
+                            <option value="monthly">Monthly revenue</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date range</label>
+                        <div class="form-check mb-2">
+                            <input type="checkbox" id="ptExportAll"
+                                   class="form-check-input" checked>
+                            <label for="ptExportAll" class="form-check-label">
+                                All records
+                            </label>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <input type="date" id="ptExportStart"
+                                   class="form-control"
+                                   aria-label="Start date" disabled>
+                            <input type="date" id="ptExportEnd"
+                                   class="form-control"
+                                   aria-label="End date" disabled>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-download me-1"></i>
+                        Export
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

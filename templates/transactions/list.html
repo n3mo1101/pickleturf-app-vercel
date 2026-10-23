@@ -1,0 +1,243 @@
+{% extends 'layouts/base.html' %}
+{% load dict_filters %}
+{% block title %}Transactions{% endblock %}
+
+{% block content %}
+<header class="pt-page-header">
+    <div>
+        <h1 class="pt-page-title">Transactions</h1>
+        <p class="pt-page-subtitle">Track and manage all payments</p>
+    </div>
+    <div class="pt-page-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#ptExportModal"
+                data-export-url="{% url 'dashboard:export_csv' %}"
+                data-export-type="transactions">
+            <i class="bi bi-download"></i> Export CSV
+        </button>
+    </div>
+</header>
+
+{# ── Filters ── #}
+<form method="get" class="pt-filters" id="filter-form">
+    <select name="type" class="form-select">
+        <option value="">All types</option>
+        {% for val, label in type_choices %}
+        <option value="{{ val }}"
+            {% if type_filter == val %}selected{% endif %}>
+            {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+    <select name="status" class="form-select">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}"
+            {% if status_filter == val %}selected{% endif %}>
+            {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+    <input type="date" name="date_from"
+           class="form-control"
+           value="{{ date_from }}">
+    <input type="date" name="date_to"
+           class="form-control"
+           value="{{ date_to }}">
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+    <a href="{% url 'transactions:list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-eraser"></i> Clear
+    </a>
+</form>
+
+{# ── Summary ── #}
+<div class="row g-3 mb-4">
+    <div class="col-6">
+        <div class="card stat-tile text-center">
+            <div class="stat-tile-value text-ok">₱{{ total_amount|floatformat:2 }}</div>
+            <div class="stat-tile-label mt-1">Total{% if type_filter or status_filter or date_from or date_to %} (filtered){% endif %}</div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card stat-tile text-center">
+            <div class="stat-tile-value">{{ total_count }}</div>
+            <div class="stat-tile-label mt-1">Transactions{% if type_filter or status_filter or date_from or date_to %} (filtered){% endif %}</div>
+        </div>
+    </div>
+</div>
+
+{# ── Table ── #}
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>Date</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tx in transactions %}
+            <tr>
+                <td data-label="#" class="text-muted small">{{ tx.pk }}</td>
+                <td data-label="Type">
+                    {% if tx.tx_type == 'booking' %}
+                        <span class="badge bg-success">Booking</span>
+                    {% elif tx.tx_type == 'sale' %}
+                        <span class="badge bg-primary">Sale</span>
+                    {% elif tx.tx_type == 'rental' %}
+                        <span class="badge bg-warning">Rental</span>
+                    {% elif tx.tx_type == 'openplay' %}
+                        <span class="badge bg-info">Open Play</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Manual</span>
+                    {% endif %}
+                </td>
+                <td data-label="Description" class="small">
+                    {{ tx.description|tx_desc|default:"—"|truncatechars:50 }}
+                </td>
+                <td data-label="Amount" class="fw-semibold text-ok">
+                    ₱{{ tx.amount|floatformat:2 }}
+                </td>
+                <td data-label="Status">
+                    {% if tx.payment_status == 'paid' %}
+                        <span class="badge bg-success">Paid</span>
+                    {% elif tx.payment_status == 'pending' %}
+                        <span class="badge bg-warning">Pending</span>
+                    {% elif tx.payment_status == 'refunded' %}
+                        <span class="badge bg-danger">Refunded</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Waived</span>
+                    {% endif %}
+                </td>
+                <td data-label="Payment" class="small">
+                    {% if tx.provider == 'paymongo' %}
+                        <span class="badge bg-primary">
+                            <i class="bi bi-credit-card me-1"></i>Online
+                        </span>
+                        {% if tx.payment_method %}
+                        <span class="badge bg-secondary">{{ tx.payment_method|upper }}</span>
+                        {% endif %}
+                        {% if tx.provider_payment_id %}
+                        <div class="text-muted" style="font-size:.7rem;">
+                            {{ tx.provider_payment_id }}
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge bg-secondary">On-site</span>
+                    {% endif %}
+                </td>
+                <td data-label="Date" class="text-muted small text-nowrap">
+                    {{ tx.created_at|date:"M d, Y" }}<br>
+                    <span style="font-size:.7rem;">
+                        {{ tx.created_at|time:"g:i A" }}
+                    </span>
+                </td>
+                {% if tx.payment_status == 'pending' %}
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for transaction #{{ tx.pk }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post"
+                                      action="{% url 'transactions:mark_paid' tx.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Mark as paid"
+                                      data-pt-confirm-body="Transaction #{{ tx.pk }} will be recorded as paid."
+                                      data-pt-confirm-label="Mark paid"
+                                      data-pt-confirm-class="btn-primary">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next"
+                                           value="{{ request.get_full_path }}">
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-check-circle"></i> Mark paid
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </td>
+                {% else %}
+                <td class="td-actions"></td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="bi bi-receipt"></i>
+                    No transactions found.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# ── Pagination ── #}
+{% if transactions.has_other_pages %}
+<nav class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+
+        {% if transactions.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ transactions.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+                &laquo; Prev
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">&laquo; Prev</span>
+        </li>
+        {% endif %}
+
+        {% for num in transactions.paginator.page_range %}
+            {% if transactions.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link"
+                   href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">
+                    {{ num }}
+                </a>
+            </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if transactions.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ transactions.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+                Next &raquo;
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Next &raquo;</span>
+        </li>
+        {% endif %}
+
+    </ul>
+    <p class="text-center text-muted small mb-0">
+        Page {{ transactions.number }} of
+        {{ transactions.paginator.num_pages }}
+        &middot; {{ total_count }} total
+    </p>
+</nav>
+{% endif %}
+
+{% endblock %}

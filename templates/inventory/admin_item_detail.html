@@ -1,0 +1,156 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'inventory:admin_list' %}" class="text-muted small">
+        <i class="bi bi-arrow-left"></i> Inventory
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0">
+            {% if item.image %}
+            <img src="{{ item.image.url }}" class="card-img-top"
+                 style="max-height:250px;object-fit:cover;">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="fw-bold">{{ item.name }}</h5>
+                <p class="text-muted small">{{ item.description|default:"No description." }}</p>
+
+                <table class="table table-sm table-borderless table-card-mobile">
+                    <tr><td class="text-muted">Category</td>
+                        <td>{{ item.category.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Type</td>
+                        <td>{{ item.get_item_type_display }}</td></tr>
+                    <tr><td class="text-muted">Sale Price</td>
+                        <td>{% if item.sale_price %}₱{{ item.sale_price }}{% else %}—{% endif %}</td></tr>
+                    <tr><td class="text-muted">Rent Price</td>
+                        <td>{% if item.rent_price %}₱{{ item.rent_price }}/hr{% else %}—{% endif %}</td></tr>
+                    <tr><td class="text-muted">Stock</td>
+                        <td class="fw-bold
+                            {% if item.stock == 0 %}text-danger
+                            {% elif item.stock <= 5 %}text-warning
+                            {% else %}text-success{% endif %}">
+                            {{ item.stock }} units
+                        </td></tr>
+                    <tr><td class="text-muted">Status</td>
+                        <td>{% if item.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td></tr>
+                </table>
+
+                <div class="d-flex gap-2 flex-wrap mt-2">
+                    <a href="{% url 'inventory:admin_edit' item.pk %}"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <a href="{% url 'inventory:admin_stock' item.pk %}"
+                       class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-boxes"></i> Adjust Stock
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        {# Active Rentals #}
+        {% if active_rentals %}
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                Active rentals
+                <span class="badge bg-primary">{{ active_rentals|length }}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 table-card-mobile">
+                    <thead>
+                        <tr><th>Customer</th><th>Rented At</th><th>Qty</th><th>Cost</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in active_rentals %}
+                        <tr>
+                            <td>{{ r.renter_name }}</td>
+                            <td>{{ r.rented_at|date:"M d, g:i A" }}</td>
+                            <td>{{ r.quantity }}h</td>
+                            <td>₱{{ r.total_cost }}</td>
+                            <td>
+                                <form method="post"
+                                      action="{% url 'inventory:admin_return' r.pk %}"
+                                      class="d-inline"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Return rental"
+                                      data-pt-confirm-body="Confirm this rental has been returned? Stock will be restored."
+                                      data-pt-confirm-label="Confirm return"
+                                      data-pt-confirm-class="btn-primary"
+                                      data-pt-confirm-details='[
+                                          {"label":"Item","value":"{{ item.name|escapejs }}"},
+                                          {"label":"Quantity","value":"{{ r.quantity }}"},
+                                          {"label":"Renter","value":"{{ r.renter_name|escapejs }}"},
+                                          {"label":"Rented At","value":"{{ r.rented_at|date:"M d, g:i A" }}"},
+                                          {"label":"Total Cost","value":"₱{{ r.total_cost }}"}
+                                      ]'>
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-primary">
+                                        Return
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Recent Rental History #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-header fw-semibold">
+                Recent rental history
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 table-card-mobile">
+                    <thead>
+                        <tr>
+                            <th>Customer</th><th>Rented</th>
+                            <th>Returned</th><th>Cost</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_rentals %}
+                        <tr>
+                            <td>{{ r.user.renter_name }}</td>
+                            <td>{{ r.rented_at|date:"M d" }}</td>
+                            <td>
+                                {{ r.returned_at|date:"M d"|default:"—" }}
+                            </td>
+                            <td>₱{{ r.total_cost }}</td>
+                            <td>
+                                {% if r.status == 'active' %}
+                                <span class="badge bg-warning">Active</span>
+                                {% elif r.status == 'returned' %}
+                                <span class="badge bg-success">Returned</span>
+                                {% else %}
+                                <span class="badge bg-danger">Overdue</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">
+                                No rental history.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

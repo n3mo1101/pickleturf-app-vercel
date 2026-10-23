@@ -1,0 +1,27 @@
+{% extends 'accounts/base_auth.html' %}
+
+{% block auth_title %}Verify email{% endblock %}
+{% block card_title %}Check your inbox{% endblock %}
+{% block card_subtitle %}One more step to get started{% endblock %}
+
+{% block auth_content %}
+<div class="text-center py-2">
+    <div style="width:72px;height:72px;background:var(--pt-yellow-pale);
+                border-radius:50%;display:flex;align-items:center;
+                justify-content:center;margin:0 auto 20px;font-size:2rem;">
+        <i class="bi bi-send-check-fill text-navy"></i>
+    </div>
+    <p class="text-muted">
+        A verification email has been sent to your address.
+        Click the link in the email to activate your account.
+    </p>
+    <p class="text-muted small">
+        Didn't receive it? Check your spam folder or
+        <a href="{% url 'account_email' %}">resend the email</a>.
+    </p>
+    <a href="{% url 'account_login' %}"
+       class="btn btn-outline-secondary w-100 mt-3">
+        <i class="bi bi-arrow-left me-2"></i>Back to sign in
+    </a>
+</div>
+{% endblock %}

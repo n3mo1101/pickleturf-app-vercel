@@ -1,0 +1,76 @@
+/* ==============================================================
+   PickleTurf · dark-mode.css
+   Overrides for Bootstrap utilities that don't use design tokens.
+   Token-driven colors (badges, alerts, slots, forms) flip
+   automatically via [data-theme="dark"] variables in base.css.
+   ============================================================== */
+
+/* ── Bootstrap utility patches ─────────────────────────────── */
+[data-theme="dark"] .text-muted { color: var(--text-muted) !important; }
+[data-theme="dark"] .text-dark  { color: var(--text) !important; }
+[data-theme="dark"] .text-navy  { color: var(--text) !important; }
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .bg-white   { background: var(--bg-card) !important; }
+[data-theme="dark"] .border     { border-color: var(--border) !important; }
+
+/* Body / text defaults inside components */
+[data-theme="dark"] .card-body,
+[data-theme="dark"] .card-body p,
+[data-theme="dark"] .card-body span,
+[data-theme="dark"] .card-body div,
+[data-theme="dark"] .card-body small,
+[data-theme="dark"] .card-body label { color: var(--text); }
+
+[data-theme="dark"] h1,[data-theme="dark"] h2,
+[data-theme="dark"] h3,[data-theme="dark"] h4,
+[data-theme="dark"] h5,[data-theme="dark"] h6 { color: var(--text); }
+
+[data-theme="dark"] label { color: var(--text) !important; }
+[data-theme="dark"] .form-text,
+[data-theme="dark"] .helptext { color: var(--text-muted) !important; }
+[data-theme="dark"] ::placeholder { color: var(--text-muted) !important; opacity: 1; }
+
+/* Tables */
+[data-theme="dark"] .table td,
+[data-theme="dark"] .table th { color: var(--text) !important; }
+[data-theme="dark"] .table-bordered td,
+[data-theme="dark"] .table-bordered th { border-color: var(--border) !important; }
+
+/* List groups sit on card background, not page background */
+[data-theme="dark"] .list-group-item {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+[data-theme="dark"] .list-group-item *:not(.badge) { color: inherit; }
+
+/* Cards / headers with Bootstrap color utilities */
+[data-theme="dark"] .card-header.bg-dark,
+[data-theme="dark"] .card-header.bg-success,
+[data-theme="dark"] .card-header.bg-primary {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* Close buttons need inverting against dark surfaces */
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+  opacity: .7;
+}
+
+/* Topbar sits on the dark shell */
+[data-theme="dark"] .pt-topbar { background: var(--pt-navy-dark); }
+
+/* Progress track */
+[data-theme="dark"] .progress { background: var(--border); }
+
+/* Dashboard KPI accent border — navy is invisible on dark surfaces */
+[data-theme="dark"] .card.kpi-row { border-left-color: #5F80BF; }
+
+/* Range toggle active state — same lighter navy on dark surfaces */
+[data-theme="dark"] .btn-range .btn.active {
+  background: #5F80BF !important;
+  border-color: #5F80BF !important;
+  color: #fff !important;
+}

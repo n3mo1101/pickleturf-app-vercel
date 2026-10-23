@@ -1,0 +1,9 @@
+Hi {{ user.first_name }},
+
+Please confirm your email by clicking the link below:
+
+{{ activate_url }}
+
+If you did not register, ignore this email.
+
+– The PickleTurf Team

@@ -1,0 +1,43 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Update booking status{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-header fw-semibold">
+                Update booking #{{ booking.id }}
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush mb-3">
+                    <li class="list-group-item"><strong>Customer:</strong> {{ booking.user.full_name }}</li>
+                    <li class="list-group-item"><strong>Court:</strong> {{ booking.court.name }}</li>
+                    <li class="list-group-item"><strong>Date:</strong> {{ booking.date|date:"F j, Y" }}</li>
+                    <li class="list-group-item"><strong>Time:</strong> {{ booking.start_time|time:"g:i A" }}</li>
+                    <li class="list-group-item"><strong>Notes:</strong> {{ booking.notes }}</li>
+                    <li class="list-group-item"><strong>Current Status:</strong>
+                        <span class="badge bg-secondary">{{ booking.get_status_display }}</span>
+                    </li>
+                </ul>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">New Status</label>
+                        <select name="status" class="form-select">
+                            {% for val, label in status_choices %}
+                            <option value="{{ val }}" {% if booking.status == val %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill">Update status</button>
+                        <a href="{% url 'bookings:admin_list' %}" class="btn btn-outline-secondary flex-fill">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

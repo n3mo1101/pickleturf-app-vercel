@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PickleTurf · Your Premier Pickleball Destination</title>
+    <link rel="icon" href="{% static 'img/logo-fav.png' %}" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Main Styles -->
+    <link href="{% static 'css/base.css' %}" rel="stylesheet">
+    <link href="{% static 'css/components.css' %}" rel="stylesheet">
+    <link href="{% static 'css/pages.css' %}" rel="stylesheet">
+    <link href="{% static 'css/dark-mode.css' %}" rel="stylesheet">
+
+    {# PWA Manifest #}
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#1B2A4A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PickleTurf">
+    <link rel="apple-touch-icon" href="{% static 'img/logo-256.png' %}">
+</head>
+<body class="pt-landing">
+
+{# ── Hero ── #}
+<section class="pt-hero">
+    <div class="pt-hero-content fade-in-up">
+        <img src="{% static 'img/logo.png' %}" alt="PickleTurf" class="pt-hero-logo">
+        <h1>Pickle<span>Turf</span></h1>
+        <p class="pt-hero-sub">
+            Your premier pickleball facility. Book courts,
+            join open play, and gear up for every match.
+        </p>
+        <div class="pt-hero-cta">
+            <a href="{% url 'account_signup' %}" class="btn pt-cta-primary">
+                <i class="bi bi-person-plus-fill me-2"></i>Create account
+            </a>
+            <a href="{% url 'account_login' %}" class="btn pt-cta-outline">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Sign in
+            </a>
+        </div>
+    </div>
+    <div class="pt-scroll-hint">
+        <span>Explore</span>
+        <i class="bi bi-chevron-down"></i>
+    </div>
+</section>
+
+{# ── Features ── #}
+<section class="pt-features">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 style="font-size:2rem;">
+                Everything you need
+            </h2>
+            <p class="text-muted">
+                Manage your game from booking to gear, all in one place.
+            </p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-sm-6 col-lg-3">
+                <div class="pt-feature-card fade-in-up">
+                    <div class="pt-feature-icon">
+                        <i class="bi bi-calendar3-fill"></i>
+                    </div>
+                    <h5>Court booking</h5>
+                    <p>Reserve any of our 5 courts in seconds. Choose your slot, confirm, and play.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="pt-feature-card fade-in-up">
+                    <div class="pt-feature-icon">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <h5>Open play</h5>
+                    <p>Join community sessions, meet new players, and grow your game together.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="pt-feature-card fade-in-up">
+                    <div class="pt-feature-icon">
+                        <i class="bi bi-shop-window"></i>
+                    </div>
+                    <h5>Equipment</h5>
+                    <p>Browse paddles, balls, and shoes. Rent or buy gear right at the facility.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="pt-feature-card fade-in-up">
+                    <div class="pt-feature-icon">
+                        <i class="bi bi-lightning-charge-fill"></i>
+                    </div>
+                    <h5>Instant access</h5>
+                    <p>Check availability, manage bookings, and track your history anytime.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ── CTA Strip ── #}
+<section class="pt-cta-strip">
+    <div class="container" style="position:relative;z-index:1;">
+        <h2>Ready to play?</h2>
+        <p>Create your free account and book your first court today.</p>
+        <a href="{% url 'account_signup' %}" class="btn pt-cta-primary btn-lg">
+            <i class="bi bi-arrow-right-circle-fill me-2"></i>Get started
+        </a>
+    </div>
+</section>
+
+{# ── Footer ── #}
+<footer class="pt-landing-footer">
+    <p>© {% now "Y" %} <span>PickleTurf</span>. All rights reserved.</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/main.js' %}"></script>
+
+{# PWA Service Worker Registration #}
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker
+            .register('/sw.js', { scope: '/' })
+            .then(reg => {
+                console.log('SW registered:', reg.scope);
+            })
+            .catch(err => {
+                console.log('SW registration failed:', err);
+            });
+    });
+}
+</script>
+
+</body>
+</html>

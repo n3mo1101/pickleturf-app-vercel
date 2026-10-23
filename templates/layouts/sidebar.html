@@ -1,0 +1,199 @@
+{% load static %}
+<aside class="pt-sidebar" id="ptSidebar">
+
+    {# ── Brand ── #}
+    <a href="{% if is_admin_or_staff %}{% url 'dashboard:index' %}{% else %}{% url 'core:home' %}{% endif %}"
+    class="pt-brand">
+        <span class="pt-brand-name">Pickle<span>Turf</span></span>
+    </a>
+
+    {# ── User Info ── #}
+    <div class="pt-sidebar-user">
+        <div class="pt-user-avatar">
+            {% if user.avatar %}
+                <img src="{{ user.avatar.url }}" alt="{{ user.full_name }}">
+            {% else %}
+                {{ user.first_name|first|upper }}
+            {% endif %}
+        </div>
+        <div class="overflow-hidden">
+            <div class="pt-user-name">{{ user.full_name }}</div>
+            <div class="pt-user-role">{{ user.get_role_display }}</div>
+        </div>
+    </div>
+
+    {# ── Navigation ── #}
+    <nav class="pt-sidebar-nav">
+
+        {% if is_admin_or_staff %}
+        {# ════════════ ADMIN / STAFF NAV ════════════ #}
+
+        {# Dashboard #}
+        <a href="{% url 'dashboard:index' %}"
+           class="pt-nav-link {% if '/dashboard/' in request.path %}active{% endif %}">
+            <i class="bi bi-speedometer2 nav-icon"></i>
+            <span>Dashboard</span>
+        </a>
+
+        {# Announcements #}
+        <a href="{% url 'announcements:admin_list' %}"
+           class="pt-nav-link {% if '/announcements/' in request.path %}active{% endif %}">
+            <i class="bi bi-megaphone nav-icon"></i>
+            <span>Announcements</span>
+        </a>
+
+        {# Booking (dropdown) #}
+        <a class="pt-nav-link {% if '/bookings/' in request.path %}parent-active{% endif %}"
+           data-bs-toggle="collapse"
+           data-bs-target="#sb-bookings"
+           aria-expanded="{% if '/bookings/' in request.path %}true{% else %}false{% endif %}">
+            <i class="bi bi-calendar3 nav-icon"></i>
+            <span>Booking</span>
+            <i class="bi bi-chevron-down pt-chevron"></i>
+        </a>
+        <div class="collapse pt-submenu {% if '/bookings/' in request.path %}show{% endif %}"
+             id="sb-bookings">
+            <a href="{% url 'bookings:availability' %}"
+               class="pt-submenu-link {% if request.path == '/bookings/' %}active{% endif %}">
+                Availability
+            </a>
+            <a href="{% url 'bookings:staff_bookings' %}"
+               class="pt-submenu-link {% if 'staff-bookings' in request.path %}active{% endif %}">
+                 Staff bookings
+            </a>
+            <a href="{% url 'bookings:admin_list' %}"
+               class="pt-submenu-link {% if 'admin' in request.path and '/bookings/' in request.path %}active{% endif %}">
+                 All bookings
+            </a>
+        </div>
+
+        {# Open Play #}
+        <a href="{% url 'openplay:admin_list' %}"
+           class="pt-nav-link {% if '/openplay/' in request.path %}active{% endif %}">
+            <i class="bi bi-people-fill nav-icon"></i>
+            <span>Open play</span>
+        </a>
+
+        {# Shop (dropdown) #}
+        <a class="pt-nav-link {% if '/inventory/' in request.path and 'pos' in request.path or '/inventory/' in request.path and 'rentals' in request.path %}parent-active{% endif %}"
+           data-bs-toggle="collapse"
+           data-bs-target="#sb-shop"
+           aria-expanded="{% if '/inventory/' in request.path and 'pos' in request.path or '/inventory/' in request.path and 'rentals' in request.path %}true{% else %}false{% endif %}">
+            <i class="bi bi-shop nav-icon"></i>
+            <span>Shop</span>
+            <i class="bi bi-chevron-down pt-chevron"></i>
+        </a>
+        <div class="collapse pt-submenu {% if '/inventory/' in request.path %}show{% endif %}"
+             id="sb-shop">
+            <a href="{% url 'inventory:admin_pos' %}"
+               class="pt-submenu-link {% if 'pos' in request.path %}active{% endif %}">
+                Purchase
+            </a>
+            <a href="{% url 'inventory:admin_rental_pos' %}"
+               class="pt-submenu-link {% if 'rentals/new' in request.path %}active{% endif %}">
+                Rent
+            </a>
+        </div>
+
+        {# Inventory #}
+        <a href="{% url 'inventory:admin_list' %}"
+           class="pt-nav-link {% if '/inventory/admin/' in request.path and 'pos' not in request.path and 'rentals' not in request.path %}active{% endif %}">
+            <i class="bi bi-boxes nav-icon"></i>
+            <span>Inventory</span>
+        </a>
+
+        {# Transactions #}
+        <a href="{% url 'transactions:list' %}"
+           class="pt-nav-link {% if '/transactions/' in request.path %}active{% endif %}">
+            <i class="bi bi-cash-stack nav-icon"></i>
+            <span>Transactions</span>
+        </a>
+
+        {% else %}
+        {# ════════════ CUSTOMER NAV ════════════ #}
+
+        {# Home #}
+        <a href="{% url 'core:home' %}"
+           class="pt-nav-link {% if request.path == '/' %}active{% endif %}">
+            <i class="bi bi-house-fill nav-icon"></i>
+            <span>Home</span>
+        </a>
+
+        {# Booking (dropdown) #}
+        <a class="pt-nav-link {% if '/bookings/' in request.path %}parent-active{% endif %}"
+           data-bs-toggle="collapse"
+           data-bs-target="#sb-cust-bookings"
+           aria-expanded="{% if '/bookings/' in request.path %}true{% else %}false{% endif %}">
+            <i class="bi bi-calendar3 nav-icon"></i>
+            <span>Booking</span>
+            <i class="bi bi-chevron-down pt-chevron"></i>
+        </a>
+        <div class="collapse pt-submenu {% if '/bookings/' in request.path %}show{% endif %}"
+             id="sb-cust-bookings">
+            <a href="{% url 'bookings:availability' %}"
+               class="pt-submenu-link {% if request.path == '/bookings/' %}active{% endif %}">
+                Availability
+            </a>
+            <a href="{% url 'bookings:my_bookings' %}"
+               class="pt-submenu-link {% if 'my' in request.path %}active{% endif %}">
+                 My bookings
+            </a>
+        </div>
+
+        {# Open Play #}
+        <a href="{% url 'openplay:list' %}"
+           class="pt-nav-link {% if '/openplay/' in request.path %}active{% endif %}">
+            <i class="bi bi-people-fill nav-icon"></i>
+            <span>Open play</span>
+        </a>
+
+        {# Shop #}
+        <a href="{% url 'inventory:shop' %}"
+           class="pt-nav-link {% if '/inventory/shop/' in request.path %}active{% endif %}">
+            <i class="bi bi-shop nav-icon"></i>
+            <span>Shop</span>
+        </a>
+
+        {% endif %}
+
+    </nav>
+
+    {# ── Footer: Profile + Theme + Logout ── #}
+    <div class="pt-sidebar-footer">
+
+        {# Profile #}
+        <a href="{% url 'accounts:profile' %}"
+           class="pt-nav-link {% if '/accounts/profile/' in request.path %}active{% endif %}">
+            <i class="bi bi-person-circle nav-icon"></i>
+            <span>Profile</span>
+        </a>
+
+        {# Theme Toggle #}
+        <button class="pt-nav-link" onclick="toggleTheme()"
+                id="themeToggleBtn">
+            <i class="bi bi-moon-fill nav-icon"></i>
+            <span>Dark mode</span>
+        </button>
+
+        {# Logout #}
+        <a href="{% url 'account_logout' %}"
+           class="pt-nav-link pt-nav-link--danger"
+           data-pt-confirm
+           data-pt-confirm-title="Sign out"
+           data-pt-confirm-body="You'll need to sign in again to continue."
+           data-pt-confirm-label="Sign out"
+           data-pt-confirm-class="btn-danger">
+            <i class="bi bi-box-arrow-left nav-icon"></i>
+            <span>Sign out</span>
+        </a>
+
+        {# PWA Install Button — only visible when installable #}
+        <button class="pt-nav-link"
+                id="pwaInstallBtn"
+                onclick="installPWA()">
+            <i class="bi bi-download nav-icon"></i>
+            <span>Install app</span>
+        </button>
+    </div>
+
+</aside>
