@@ -2,6 +2,7 @@ from datetime import date, time, timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from courts.models import Court
 from bookings.models import Booking
 from bookings.services import (
@@ -309,3 +310,64 @@ class BookingServiceTests(TestCase):
             start_time=time(11, 0),  # 11 AM → entirely in morning → ₱300
         )
         self.assertEqual(booking.price, 300)
+
+
+class BookingStatusViewTests(TestCase):
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email='desk@test.com',
+            password='testpass123',
+            first_name='Desk',
+            last_name='Staff',
+            role='staff',
+            is_staff=True,
+        )
+        self.customer = User.objects.create_user(
+            email='customer2@test.com',
+            password='testpass123',
+            first_name='Test',
+            last_name='Customer',
+        )
+        self.court = Court.objects.create(name='Court 3', is_active=True)
+        self.booking = Booking.objects.create(
+            user=self.customer,
+            court=self.court,
+            date=date.today() + timedelta(days=1),
+            start_time=time(9, 0),
+            status=Booking.Status.CONFIRMED,
+        )
+        self.client.force_login(self.staff)
+
+    def test_status_modal_returns_partial(self):
+        response = self.client.get(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {'modal': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'bookings/_booking_status_modal.html'
+        )
+        self.assertNotContains(response, '<!DOCTYPE html>')
+
+    def test_status_update_redirects_to_next(self):
+        response = self.client.post(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {
+                'status': Booking.Status.COMPLETED,
+                'next': reverse('bookings:staff_bookings'),
+            },
+        )
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.Status.COMPLETED)
+        self.assertEqual(response.url, reverse('bookings:staff_bookings'))
+
+    def test_status_update_ignores_unsafe_next(self):
+        response = self.client.post(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {
+                'status': Booking.Status.CANCELLED,
+                'next': 'https://evil.example/',
+            },
+        )
+        self.assertEqual(response.url, reverse('bookings:admin_list'))

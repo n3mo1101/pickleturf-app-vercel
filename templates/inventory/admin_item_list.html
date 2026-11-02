@@ -164,7 +164,8 @@
                             </li>
                             <li>
                                 <a class="dropdown-item"
-                                   href="{% url 'inventory:admin_stock' item.pk %}">
+                                   href="{% url 'inventory:admin_stock' item.pk %}?next={{ request.get_full_path|urlencode }}"
+                                   data-pt-form-modal>
                                     <i class="bi bi-boxes"></i> Adjust stock
                                 </a>
                             </li>

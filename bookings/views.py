@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 from courts.models import Court
 from accounts.decorators import admin_or_staff_required
+from core.utils import is_modal_request, safe_next_url
 from .forms import BookingForm
 from .models import Booking
 from . import services
@@ -272,13 +273,17 @@ def admin_booking_status_view(request, pk):
     from transactions.models import Transaction
 
     booking = get_object_or_404(Booking, pk=pk)
+    next_url = safe_next_url(
+        request,
+        request.POST.get('next') or request.GET.get('next'),
+    )
 
     if request.method == 'POST':
         new_status = request.POST.get('status')
 
         if new_status not in dict(Booking.Status.choices):
             messages.error(request, 'Invalid status.')
-            return redirect('bookings:admin_list')
+            return redirect(next_url or 'bookings:admin_list')
 
         booking.status = new_status
         if new_status == Booking.Status.CANCELLED:
@@ -305,11 +310,17 @@ def admin_booking_status_view(request, pk):
             f'Booking #{pk} status updated to '
             f'{booking.get_status_display()}.'
         )
-        return redirect('bookings:admin_list')
+        return redirect(next_url or 'bookings:admin_list')
 
-    return render(request, 'bookings/admin_booking_status.html', {
+    template = (
+        'bookings/_booking_status_modal.html'
+        if is_modal_request(request)
+        else 'bookings/admin_booking_status.html'
+    )
+    return render(request, template, {
         'booking':        booking,
         'status_choices': Booking.Status.choices,
+        'next':           next_url or '',
     })
 
 

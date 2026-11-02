@@ -90,7 +90,8 @@
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
                                 <a class="dropdown-item"
-                                   href="{% url 'bookings:admin_status' b.pk %}">
+                                   href="{% url 'bookings:admin_status' b.pk %}?next={{ request.get_full_path|urlencode }}"
+                                   data-pt-form-modal>
                                     <i class="bi bi-pencil"></i> Update status
                                 </a>
                             </li>

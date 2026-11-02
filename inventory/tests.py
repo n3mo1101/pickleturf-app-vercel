@@ -3,6 +3,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from inventory.models import Category, InventoryItem, RentalRecord, Sale
 from inventory.services import (
     process_sale,
@@ -228,3 +229,111 @@ class InventoryStockTests(TestCase):
         return_rental(records[0])
         with self.assertRaises(ValidationError):
             return_rental(records[0])
+
+
+class InventoryModalViewTests(TestCase):
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email='inventory@test.com',
+            password='testpass123',
+            first_name='Inventory',
+            last_name='Staff',
+            role='staff',
+            is_staff=True,
+        )
+        self.category = Category.objects.create(name='Accessories')
+        self.item = InventoryItem.objects.create(
+            name='Grip Tape',
+            category=self.category,
+            item_type=InventoryItem.ItemType.SALE,
+            sale_price=150,
+            stock=10,
+        )
+        self.client.force_login(self.staff)
+
+    def test_stock_modal_returns_partial(self):
+        response = self.client.get(
+            reverse('inventory:admin_stock', args=[self.item.pk]),
+            {'modal': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'inventory/_stock_adjust_modal.html'
+        )
+        self.assertNotContains(response, '<!DOCTYPE html>')
+        self.assertContains(response, 'Current stock')
+
+    def test_stock_adjust_redirects_to_next(self):
+        response = self.client.post(
+            reverse('inventory:admin_stock', args=[self.item.pk]),
+            {
+                'action': 'add',
+                'quantity': 5,
+                'next': reverse('inventory:admin_list'),
+            },
+        )
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.stock, 15)
+        self.assertEqual(response.url, reverse('inventory:admin_list'))
+
+    def test_stock_adjust_error_stays_in_modal(self):
+        response = self.client.post(
+            reverse('inventory:admin_stock', args=[self.item.pk]),
+            {
+                'action': 'deduct',
+                'quantity': 99,
+                'next': reverse('inventory:admin_list'),
+            },
+            HTTP_X_REQUESTED_WITH='fetch',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'inventory/_stock_adjust_modal.html'
+        )
+        self.assertContains(response, 'Insufficient stock')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.stock, 10)
+
+    def test_category_create_modal_returns_partial(self):
+        response = self.client.get(
+            reverse('inventory:admin_category_create'),
+            {'modal': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'inventory/_category_modal.html'
+        )
+        self.assertNotContains(response, '<!DOCTYPE html>')
+
+    def test_category_edit_modal_prefills_form(self):
+        response = self.client.get(
+            reverse('inventory:admin_category_edit', args=[self.category.pk]),
+            {'modal': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'inventory/_category_modal.html'
+        )
+        self.assertContains(response, self.category.name)
+
+    def test_category_create_from_modal(self):
+        response = self.client.post(
+            reverse('inventory:admin_category_create'),
+            {'name': 'Balls', 'description': 'Game balls'},
+            HTTP_X_REQUESTED_WITH='fetch',
+        )
+        self.assertEqual(response.url, reverse('inventory:admin_categories'))
+        self.assertTrue(Category.objects.filter(name='Balls').exists())
+
+    def test_category_invalid_modal_rerenders_with_errors(self):
+        response = self.client.post(
+            reverse('inventory:admin_category_create'),
+            {'name': self.category.name, 'description': ''},
+            HTTP_X_REQUESTED_WITH='fetch',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, 'inventory/_category_modal.html'
+        )
+        self.assertContains(response, 'already exists')

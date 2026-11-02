@@ -4,6 +4,7 @@ from datetime import date, time, timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from openplay.models import OpenPlaySession, OpenPlayParticipant
 from openplay.services import (
     request_join,
@@ -160,3 +161,43 @@ class OpenPlayServiceTests(TestCase):
         cancel_session(self.session)
         with self.assertRaises(ValidationError):
             request_join(self.user1, self.session)
+
+
+class OpenPlayAdminConfirmationTests(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email='session-admin@test.com',
+            password='testpass123',
+            first_name='Session',
+            last_name='Admin',
+            role='admin',
+            is_staff=True,
+        )
+        self.player = User.objects.create_user(
+            email='session-player@test.com',
+            password='testpass123',
+            first_name='Session',
+            last_name='Player',
+        )
+        self.session = OpenPlaySession.objects.create(
+            title='Evening Open Play',
+            date=date.today() + timedelta(days=1),
+            start_time=time(18, 0),
+            end_time=time(20, 0),
+            capacity=8,
+            fee=100,
+            created_by=self.admin,
+        )
+        request_join(self.player, self.session)
+        self.client.force_login(self.admin)
+
+    def test_participant_actions_have_confirmation_modals(self):
+        response = self.client.get(
+            reverse('openplay:admin_detail', args=[self.session.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-pt-confirm-title="Approve participant"')
+        self.assertContains(response, 'data-pt-confirm-title="Reject participant"')
+        self.assertContains(response, 'data-pt-confirm-title="Add participant"')
+        self.assertContains(response, 'id="addParticipantForm"')

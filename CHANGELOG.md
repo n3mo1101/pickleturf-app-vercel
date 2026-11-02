@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-02 — Admin form modals
+
+### Added
+- Shared form modal loader with partial rendering for booking status, stock adjustment, and category forms
+- Confirmation modals for open play approve, reject, and manual participant actions
+
+### Changed
+- Admin and staff booking status updates now open in a modal and return to the originating list
+- Inventory stock adjustments and category create/edit now open in modals while keeping full-page fallbacks
+- Open play participant row actions now show the participant and session names before submitting
+
 ## 2026-11-02 — UI/UX bug fixes
 
 ### Added

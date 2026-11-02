@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_or_staff_required
+from core.utils import is_modal_request, safe_next_url
 from .forms import (
     CategoryForm, InventoryItemForm,
     RentalCreateForm, StockAdjustForm,
@@ -245,6 +246,16 @@ def admin_item_detail_view(request, pk):
 def admin_stock_adjust_view(request, pk):
     item = get_object_or_404(InventoryItem, pk=pk)
     form = StockAdjustForm(request.POST or None)
+    next_url = safe_next_url(
+        request,
+        request.POST.get('next') or request.GET.get('next'),
+    )
+    modal = is_modal_request(request)
+    template = (
+        'inventory/_stock_adjust_modal.html'
+        if modal
+        else 'inventory/stock_adjust.html'
+    )
 
     if request.method == 'POST' and form.is_valid():
         data = form.cleaned_data
@@ -254,12 +265,24 @@ def admin_stock_adjust_view(request, pk):
                 request,
                 f'Stock updated. New stock: {item.stock} unit(s).'
             )
+            if next_url:
+                return redirect(next_url)
+            return redirect('inventory:admin_detail', pk=pk)
         except ValidationError as e:
+            if modal:
+                form.add_error('quantity', e.message)
+                return render(request, template, {
+                    'form': form,
+                    'item': item,
+                    'next': next_url or '',
+                })
             messages.error(request, e.message)
-        return redirect('inventory:admin_detail', pk=pk)
+            return redirect('inventory:admin_detail', pk=pk)
 
-    return render(request, 'inventory/stock_adjust.html', {
-        'form': form, 'item': item,
+    return render(request, template, {
+        'form': form,
+        'item': item,
+        'next': next_url or '',
     })
 
 
@@ -414,7 +437,12 @@ def admin_category_create_view(request):
         cat = form.save()
         messages.success(request, f'Category "{cat.name}" created.')
         return redirect('inventory:admin_categories')
-    return render(request, 'inventory/category_form.html', {
+    template = (
+        'inventory/_category_modal.html'
+        if is_modal_request(request)
+        else 'inventory/category_form.html'
+    )
+    return render(request, template, {
         'form': form, 'title': 'Add Category',
     })
 
@@ -427,6 +455,11 @@ def admin_category_edit_view(request, pk):
         form.save()
         messages.success(request, f'Category "{cat.name}" updated.')
         return redirect('inventory:admin_categories')
-    return render(request, 'inventory/category_form.html', {
+    template = (
+        'inventory/_category_modal.html'
+        if is_modal_request(request)
+        else 'inventory/category_form.html'
+    )
+    return render(request, template, {
         'form': form, 'title': f'Edit – {cat.name}',
     })

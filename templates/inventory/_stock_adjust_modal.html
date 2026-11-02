@@ -1,0 +1,30 @@
+{% load crispy_forms_tags %}
+<div class="modal-content">
+    <form method="post"
+          action="{% url 'inventory:admin_stock' item.pk %}">
+        {% csrf_token %}
+        {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+        <div class="modal-header">
+            <h5 class="modal-title" id="ptFormModalLabel">
+                Adjust stock · {{ item.name }}
+            </h5>
+            <button type="button" class="btn-close"
+                    data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-info">
+                Current stock: <strong>{{ item.stock }}</strong> unit(s)
+            </div>
+            {{ form|crispy }}
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i> Apply adjustment
+            </button>
+        </div>
+    </form>
+</div>

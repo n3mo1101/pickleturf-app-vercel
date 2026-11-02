@@ -1,0 +1,56 @@
+<div class="modal-content">
+    <form method="post"
+          action="{% url 'bookings:admin_status' booking.pk %}">
+        {% csrf_token %}
+        {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+        <div class="modal-header">
+            <h5 class="modal-title" id="ptFormModalLabel">
+                Update booking #{{ booking.id }}
+            </h5>
+            <button type="button" class="btn-close"
+                    data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <ul class="list-group list-group-flush mb-3">
+                <li class="list-group-item">
+                    <strong>Customer:</strong> {{ booking.user.full_name }}
+                </li>
+                <li class="list-group-item">
+                    <strong>Court:</strong> {{ booking.court.name }}
+                </li>
+                <li class="list-group-item">
+                    <strong>Date:</strong> {{ booking.date|date:"F j, Y" }}
+                </li>
+                <li class="list-group-item">
+                    <strong>Time:</strong> {{ booking.start_time|time:"g:i A" }}
+                </li>
+                <li class="list-group-item">
+                    <strong>Current Status:</strong>
+                    <span class="badge bg-secondary">
+                        {{ booking.get_status_display }}
+                    </span>
+                </li>
+            </ul>
+            <label class="form-label fw-semibold" for="bookingStatusSelect">
+                New Status
+            </label>
+            <select name="status" id="bookingStatusSelect" class="form-select">
+                {% for val, label in status_choices %}
+                <option value="{{ val }}"
+                    {% if booking.status == val %}selected{% endif %}>
+                    {{ label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+                Update status
+            </button>
+        </div>
+    </form>
+</div>

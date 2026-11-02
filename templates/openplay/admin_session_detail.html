@@ -125,14 +125,24 @@
                                 {% if p.status == 'pending' %}
                                 <div class="d-flex gap-1">
                                     <form method="post"
-                                          action="{% url 'openplay:admin_approve' session.pk p.pk %}">
+                                          action="{% url 'openplay:admin_approve' session.pk p.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Approve participant"
+                                          data-pt-confirm-body="Approve &quot;{{ p.display_name|escapejs }}&quot; for &quot;{{ session.title|escapejs }}&quot;?"
+                                          data-pt-confirm-label="Approve"
+                                          data-pt-confirm-class="btn-primary">
                                         {% csrf_token %}
                                         <button class="btn btn-sm btn-primary">
                                             <i class="bi bi-check"></i> Approve
                                         </button>
                                     </form>
                                     <form method="post"
-                                          action="{% url 'openplay:admin_reject' session.pk p.pk %}">
+                                          action="{% url 'openplay:admin_reject' session.pk p.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Reject participant"
+                                          data-pt-confirm-body="Reject &quot;{{ p.display_name|escapejs }}&quot; from &quot;{{ session.title|escapejs }}&quot;?"
+                                          data-pt-confirm-label="Reject"
+                                          data-pt-confirm-class="btn-danger">
                                         {% csrf_token %}
                                         <button class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-x"></i> Reject
@@ -170,7 +180,13 @@
                     <strong>Approved</strong> immediately.
                 </p>
                 <form method="post"
-                      action="{% url 'openplay:admin_add' session.pk %}">
+                      action="{% url 'openplay:admin_add' session.pk %}"
+                      id="addParticipantForm"
+                      data-pt-confirm
+                      data-pt-confirm-title="Add participant"
+                      data-pt-confirm-body="Add this participant to &quot;{{ session.title|escapejs }}&quot; as approved?"
+                      data-pt-confirm-label="Add participant"
+                      data-pt-confirm-class="btn-primary">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Participant name</label>
@@ -184,4 +200,22 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const form = document.getElementById('addParticipantForm');
+        const input = document.getElementById('id_participant_name');
+        if (!form || !input) return;
+
+        const sessionTitle = '{{ session.title|escapejs }}';
+
+        input.addEventListener('input', function () {
+            const name = input.value.trim() || 'this participant';
+            form.dataset.ptConfirmBody =
+                'Add "' + name + '" to "' + sessionTitle + '" as approved?';
+        });
+    })();
+</script>
 {% endblock %}

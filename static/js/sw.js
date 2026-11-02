@@ -3,7 +3,7 @@
    Cache-first for static assets, network-first for pages
    ============================================================ */
 
-const CACHE_VERSION  = 'pickleturf-v3';
+const CACHE_VERSION  = 'pickleturf-v4';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE  = `${CACHE_VERSION}-dynamic`;
 
@@ -18,6 +18,7 @@ const STATIC_ASSETS = [
     '/static/css/pages.css',
     '/static/css/dark-mode.css',
     '/static/js/main.js',
+    '/static/js/form-modal.js',
     '/static/js/pos.js',
     '/static/img/logo.png',
     '/static/img/logo-256.png',

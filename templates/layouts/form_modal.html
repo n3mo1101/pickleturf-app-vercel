@@ -1,0 +1,15 @@
+{% comment %}
+Reusable form modal shell.
+
+Triggers use data-pt-form-modal with the form URL as the value (or href):
+
+    <a href="{% url '...' %}" data-pt-form-modal>Edit</a>
+    <button type="button" data-pt-form-modal="{% url '...' %}">Edit</button>
+
+The URL is fetched with ?modal=1 and the returned .modal-content fragment
+is injected into #ptFormModalDialog by static/js/form-modal.js.
+{% endcomment %}
+<div class="modal fade" id="ptFormModal" tabindex="-1"
+     aria-labelledby="ptFormModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" id="ptFormModalDialog"></div>
+</div>
