@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-02 — UI/UX bug fixes
+
+### Added
+- Version control conventions in `AGENTS.md` for commit messages and `CHANGELOG.md`
+
+### Changed
+- File input chooser restyled as an inset pill with even spacing and a separate filename area
+
+### Fixed
+- New customer signups redirect to the customer home instead of the admin dashboard, removing the duplicate "Access denied" toast
+- Floating action button no longer blocks clicks on table rows underneath it
+
 ## 2026-10-09 — Export CSV modal
 
 ### Added

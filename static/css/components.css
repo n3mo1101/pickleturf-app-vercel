@@ -262,21 +262,25 @@ button:focus-visible {
   background: var(--bg);
   color: var(--text-muted);
 }
-/* File upload — theme-aware chooser button (dark mode fix) */
+/* File upload — inset pill chooser; trim input padding so the button
+   keeps an even gap on every side. */
+.form-control[type="file"] {
+  padding: .2rem;
+  line-height: 1.5;
+}
 .form-control::file-selector-button {
   background: var(--bg-hover);
   color: var(--text);
-  border: none;
-  border-right: 1px solid var(--border);
-  border-radius: var(--r-sm) 0 0 var(--r-sm);
-  margin: calc(-.55rem - 1.5px) -.9rem calc(-.55rem - 1.5px) 0;
-  padding: .55rem 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  margin: 0 .75rem 0 0;
+  padding: .35rem .85rem;
   height: auto;
   font-family: var(--font);
   font-size: .85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s, color .15s;
+  transition: background .15s, color .15s, border-color .15s;
 }
 .form-control::file-selector-button:hover {
   background: var(--navy-soft);
@@ -617,6 +621,9 @@ label.form-label {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  /* The hidden action stack still occupies space; without this the wrapper
+     intercepts clicks on table rows underneath it. */
+  pointer-events: none;
 }
 .pt-fab-actions {
   display: flex;
@@ -629,7 +636,7 @@ label.form-label {
   transform: translateY(12px);
 }
 .pt-fab-wrap.open .pt-fab-actions {
-  pointer-events: all;
+  pointer-events: auto;
   opacity: 1;
   transform: translateY(0);
 }
@@ -684,6 +691,7 @@ label.form-label {
   cursor: pointer;
   transition: all .2s;
   flex-shrink: 0;
+  pointer-events: auto;
 }
 .pt-fab-main:hover { background: var(--pt-yellow-dark); transform: scale(1.08); }
 .pt-fab-wrap.open .pt-fab-main {

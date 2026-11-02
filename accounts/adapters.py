@@ -33,14 +33,22 @@ class AccountAdapter(DefaultAccountAdapter):
             counter += 1
         return username
 
-    def get_login_redirect_url(self, request):
+    def _post_auth_redirect(self, request):
         """
         Send admin/staff to dashboard,
-        customers to home after login.
+        customers to home after login or signup.
         """
         if request.user.is_authenticated and request.user.is_admin_or_staff:
             return '/dashboard/'
         return '/'
+
+    def get_login_redirect_url(self, request):
+        return self._post_auth_redirect(request)
+
+    def get_signup_redirect_url(self, request):
+        # Without this, signups fall back to LOGIN_REDIRECT_URL (/dashboard/),
+        # which sends customers to an admin-only page and shows "Access denied."
+        return self._post_auth_redirect(request)
 
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
