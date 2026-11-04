@@ -23,15 +23,18 @@
 <div class="kpi-grid">
 
     <div class="card kpi-hero">
-        <i class="bi bi-graph-up kpi-hero-ghost"></i>
-        <div class="kpi-hero-top">
-            <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
-            <div class="kpi-label">Today's revenue</div>
+        <div class="kpi-hero-main">
+            <div class="kpi-hero-top">
+                <div class="kpi-label">Today's revenue</div>
+            </div>
+            <div class="kpi-value">₱{{ today_revenue|floatformat:2 }}</div>
+            {% if last_tx_label %}
+            <div class="kpi-sub"><i class="bi bi-arrow-up-right"></i> +₱{{ last_tx_amount|floatformat:2 }} from {{ last_tx_label }}</div>
+            {% endif %}
         </div>
-        <div class="kpi-value">₱{{ today_revenue|floatformat:2 }}</div>
-        {% if last_tx_label %}
-        <div class="kpi-sub"><i class="bi bi-arrow-up-right"></i> +₱{{ last_tx_amount|floatformat:2 }} from {{ last_tx_label }}</div>
-        {% endif %}
+        <div class="kpi-hero-spark" aria-hidden="true">
+            <canvas id="heroRevenueSpark"></canvas>
+        </div>
         <div class="kpi-hero-split">
             <div class="kpi-split-item">
                 <div class="kpi-split-label">Bookings &amp; Open Play</div>
@@ -47,32 +50,64 @@
     <div class="kpi-stack">
         <div class="card kpi-row">
             <div class="kpi-row-head">
-                <div class="kpi-icon"><i class="bi bi-graph-up"></i></div>
+                <!-- <div class="kpi-icon"><i class="bi bi-graph-up"></i></div> -->
                 <div class="kpi-label">This month</div>
             </div>
             <div class="kpi-meta">
-                <div class="kpi-value">₱{{ month_revenue|floatformat:2 }}</div>
-                <div class="kpi-note">{{ today|date:"F Y" }}</div>
+                <div class="kpi-meta-main">
+                    <div class="kpi-value">₱{{ month_revenue|floatformat:2 }}</div>
+                    <div class="kpi-note">{{ today|date:"F Y" }}</div>
+                </div>
+                <div class="kpi-row-extra">
+                    <span class="badge bg-primary">
+                        {% if month_change_pct is not None %}
+                        <i class="bi bi-arrow-{% if month_change_up %}up{% else %}down{% endif %}-right"></i>
+                        {{ month_change_pct|floatformat:1 }}% vs {{ prev_month_label }}
+                        {% else %}
+                        — vs {{ prev_month_label }}
+                        {% endif %}
+                    </span>
+                </div>
             </div>
         </div>
         <div class="card kpi-row">
             <div class="kpi-row-head">
-                <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
-                <div class="kpi-label">Bookings today</div>
+                <!-- <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div> -->
+                <div class="kpi-label">Today's bookings </div>
             </div>
             <div class="kpi-meta">
-                <div class="kpi-value">{{ bookings_today }}</div>
-                <div class="kpi-note">Confirmed + completed</div>
+                <div class="kpi-meta-main">
+                    <div class="kpi-value kpi-fraction">
+                        <span class="kpi-fraction-done">{{ bookings_completed_today }}</span>
+                        <span class="kpi-fraction-sep">/</span>
+                        <span class="kpi-fraction-total">{{ bookings_today }}</span>
+                    </div>
+                    <div class="kpi-note">Completed & total</div>
+                </div>
+                <div class="kpi-row-extra">
+                    <span class="badge bg-primary">
+                        <i class="bi-exclamation-circle"></i>
+                        {{ bookings_pending_today }} pending
+                    </span>
+                </div>
             </div>
         </div>
         <div class="card kpi-row">
             <div class="kpi-row-head">
-                <div class="kpi-icon"><i class="bi bi-clock-history"></i></div>
+                <!-- <div class="kpi-icon"><i class="bi bi-clock-history"></i></div> -->
                 <div class="kpi-label">Active rentals</div>
             </div>
             <div class="kpi-meta">
-                <div class="kpi-value">{{ active_rentals }}</div>
-                <div class="kpi-note">Currently out</div>
+                <div class="kpi-meta-main">
+                    <div class="kpi-value">{{ active_rentals }}</div>
+                    <div class="kpi-note">Currently out</div>
+                </div>
+                <div class="kpi-row-extra">
+                    <span class="badge bg-primary" title="Longest active rental">
+                        <i class="bi bi-hourglass-split"></i>
+                        {% if longest_rental_display %}{{ longest_rental_display }}{% else %}—{% endif %}
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -82,56 +117,7 @@
 {# ── Row 1: Today's Bookings + Recent Transactions ── #}
 <div class="row g-3 mb-3">
 
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">Today's bookings</span>
-                <span class="badge bg-primary">{{ bookings_today }}</span>
-            </div>
-            <div class="card-body p-0">
-                {% if todays_bookings %}
-                <ul class="list-group list-group-flush">
-                    {% for b in todays_bookings %}
-                    <li class="list-group-item py-2 px-3">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div class="fw-semibold small">
-                                    {{ b.court.name }}
-                                </div>
-                                <div class="text-muted" style="font-size:.75rem;">
-                                    {{ b.user.full_name }}
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="small text-nowrap">
-                                    {% include 'bookings/_booking_time.html' with b=b %}
-                                </div>
-                                <div class="text-ok fw-semibold"
-                                     style="font-size:.75rem;">
-                                    ₱{{ b.price|floatformat:2 }}
-                                </div>
-                            </div>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-calendar-x fs-3"></i>
-                    <p class="small mt-2 mb-0">No bookings today.</p>
-                </div>
-                {% endif %}
-            </div>
-            <div class="card-footer border-0 text-end">
-                <a href="{% url 'bookings:admin_list' %}"
-                   class="btn btn-sm btn-outline-secondary">
-                    View all
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">Recent transactions</span>
@@ -212,32 +198,52 @@
         </div>
     </div>
 
+    <div class="col-lg-3">
+        <div class="card h-100 d-flex flex-column">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Upcoming bookings</span>
+                <span class="badge bg-primary" title="Remaining today">{{ todays_bookings|length }}</span>
+            </div>
+            <div class="card-body p-0 today-bookings-body">
+                {% if todays_bookings %}
+                <ul class="list-group list-group-flush">
+                    {% for b in todays_bookings %}
+                    <li class="list-group-item py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-baseline gap-2">
+                            <div class="fw-semibold small text-truncate">
+                                {{ b.court.name }}
+                            </div>
+                            <div class="small text-muted text-nowrap">
+                                {{ b.start_time|time:"g:i A" }}–{{ b.end_time|time:"g:i A" }}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                            <div class="text-muted text-truncate booking-user">
+                                {{ b.user.full_name }}
+                            </div>
+                            <div class="text-ok fw-semibold text-nowrap booking-price">
+                                ₱{{ b.price|floatformat:2 }}
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-check fs-3"></i>
+                    <p class="small mt-2 mb-0">No more bookings today.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
 </div>
 
 {# ── Row 2: Daily Revenue + Upcoming Open Play ── #}
 <div class="row g-3 mb-3">
 
-    <div class="col-lg-9">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">Daily revenue</span>
-                <div class="btn-group btn-group-sm btn-range" role="group"
-                     aria-label="Daily revenue range">
-                    <button type="button" class="btn btn-outline-secondary"
-                            data-range="7">7D</button>
-                    <button type="button" class="btn btn-outline-secondary"
-                            data-range="14">14D</button>
-                    <button type="button" class="btn btn-outline-secondary active"
-                            data-range="30">30D</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <canvas id="dailyRevenueChart" height="100"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3">
+    <!-- <div class="col-lg-3">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">Upcoming open play</span>
@@ -277,6 +283,26 @@
                    class="btn btn-sm btn-outline-secondary">
                     Manage
                 </a>
+            </div>
+        </div>
+    </div> -->
+
+    <div class="col-lg-12">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Daily revenue</span>
+                <div class="btn-group btn-group-sm btn-range" role="group"
+                     aria-label="Daily revenue range">
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-range="7">7D</button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            data-range="14">14D</button>
+                    <button type="button" class="btn btn-outline-secondary active"
+                            data-range="30">30D</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyRevenueChart" height="100"></canvas>
             </div>
         </div>
     </div>

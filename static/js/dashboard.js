@@ -18,14 +18,15 @@ function cssVar(name) {
 
 function palette() {
     return {
-        tick:     cssVar('--chart-tick'),
-        grid:     cssVar('--chart-grid'),
-        primary:  cssVar('--chart-primary'),
-        accent:   cssVar('--chart-accent'),
-        fill:     cssVar('--chart-fill'),
-        cardBg:   cssVar('--bg-card'),
-        ok:       cssVar('--ok'),
-        info:     cssVar('--info'),
+        tick:         cssVar('--chart-tick'),
+        grid:         cssVar('--chart-grid'),
+        primary:      cssVar('--chart-primary'),
+        primaryHover: cssVar('--chart-primary-hover'),
+        accent:       cssVar('--chart-accent'),
+        fill:         cssVar('--chart-fill'),
+        cardBg:       cssVar('--bg-card'),
+        ok:           cssVar('--ok'),
+        info:         cssVar('--info'),
     };
 }
 
@@ -45,6 +46,49 @@ function buildCharts() {
 
     const p = palette();
     Chart.defaults.color = p.tick;
+
+    // ── 0. Hero revenue sparkline ─────────────────────────────────────────────
+    const sparkEl = document.getElementById('heroRevenueSpark');
+    if (sparkEl) {
+        chartInstances.push(new Chart(sparkEl, {
+            type: 'line',
+            data: {
+                labels: dailyLabels.slice(-7),
+                datasets: [{
+                    data: dailyData.slice(-7),
+                    borderColor: 'rgba(255,255,255,.85)',
+                    backgroundColor: context => {
+                        const { ctx, chartArea } = context.chart;
+                        if (!chartArea) return 'rgba(255,255,255,0)';
+                        const gradient = ctx.createLinearGradient(
+                            0, chartArea.top, 0, chartArea.bottom
+                        );
+                        gradient.addColorStop(0, 'rgba(255,255,255,.26)');
+                        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+                        return gradient;
+                    },
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: true,
+                    tension: 0.35,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 500 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false },
+                },
+                scales: {
+                    x: { display: false },
+                    y: { display: false, beginAtZero: true },
+                },
+            }
+        }));
+    }
 
     // ── 1. Daily Revenue (line) ───────────────────────────────────────────────
     const dailyEl = document.getElementById('dailyRevenueChart');
@@ -136,8 +180,8 @@ function buildCharts() {
                 datasets: [{
                     label: 'Revenue (₱)',
                     data: monthlyData,
-                    backgroundColor: p.accent,
-                    hoverBackgroundColor: cssVar('--pt-yellow-dark'),
+                    backgroundColor: p.primary,
+                    hoverBackgroundColor: p.primaryHover,
                     borderRadius: 4,
                     borderSkipped: false,
                 }]

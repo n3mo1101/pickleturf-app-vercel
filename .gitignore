@@ -129,7 +129,6 @@ celerybeat.pid
 
 # Environments
 .env
-.env.vercel
 .venv
 env/
 venv/
@@ -189,6 +188,7 @@ static_root/
 
 # Vercel
 .vercel/
+.env.vercel
 .env.local
 .env*.local
 .vercelignore

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-05 — Dashboard KPI and chart refresh
+
+### Added
+- 7-day revenue sparkline in the daily revenue KPI card
+- Month-over-month change, pending bookings, and longest active rental badges on KPI cards
+- Scrollable upcoming-bookings card that only lists today's bookings which have not ended yet
+
+### Changed
+- `Today's bookings` KPI shows completed / total, with pending included in the total
+- Recent transactions and upcoming bookings now share row 1 (`col-lg-9` / `col-lg-3`)
+- Daily revenue chart spans the full row; upcoming open play is hidden
+- Monthly revenue bars use the primary navy chart color
+- KPI card icons are hidden so card values stand out
+- Sparkline is constrained to a fixed area so revenue spikes cannot resize the hero card
+- Hero revenue divider sits below the content instead of being pinned to the card bottom
+
+### Removed
+- Legacy today's bookings list and its `View all` footer
+
 ## 2026-11-05 — Compact booking time summaries
 
 ### Changed

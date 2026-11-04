@@ -1,7 +1,7 @@
 import csv
 from datetime import date, timedelta
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q
+from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncDate, TruncMonth
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -102,6 +102,19 @@ def _revenue_by_type():
     return labels, data
 
 
+def _format_duration(delta):
+    """Compact duration for rental age, e.g. 2h 15m or 3d 4h."""
+    total_minutes = max(int(delta.total_seconds() // 60), 0)
+    days, remainder = divmod(total_minutes, 24 * 60)
+    hours, minutes = divmod(remainder, 60)
+
+    if days:
+        return f'{days}d {hours}h'
+    if hours:
+        return f'{hours}h {minutes}m'
+    return f'{minutes}m'
+
+
 # ── Main Dashboard View ────────────────────────────────────────────────────────
 
 @admin_or_staff_required
@@ -149,14 +162,56 @@ def index(request):
         .aggregate(total=Sum('amount'))['total'] or 0
     )
 
-    bookings_today = Booking.objects.filter(
-        date=today,
-        status__in=[Booking.Status.CONFIRMED, Booking.Status.COMPLETED]
-    ).count()
+    first_of_month = today.replace(day=1)
+    prev_month_end = first_of_month - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    prev_month_revenue = (
+        _revenue_queryset()
+        .filter(created_at__date__range=(prev_month_start, prev_month_end))
+        .aggregate(total=Sum('amount'))['total'] or 0
+    )
 
-    active_rentals = RentalRecord.objects.filter(
+    month_change_pct = None
+    month_change_up = True
+    if prev_month_revenue:
+        change = (
+            (float(month_revenue) - float(prev_month_revenue))
+            / float(prev_month_revenue)
+            * 100
+        )
+        month_change_pct = abs(round(change, 1))
+        month_change_up = change >= 0
+
+    booking_counts = Booking.objects.filter(
+        date=today,
+        status__in=[
+            Booking.Status.PENDING,
+            Booking.Status.CONFIRMED,
+            Booking.Status.COMPLETED,
+        ],
+    ).aggregate(
+        total=Count('id'),
+        completed=Count('id', filter=Q(status=Booking.Status.COMPLETED)),
+        pending=Count('id', filter=Q(status=Booking.Status.PENDING)),
+    )
+    bookings_today = booking_counts['total']
+    bookings_completed_today = booking_counts['completed']
+    bookings_pending_today = booking_counts['pending']
+
+    active_rental_qs = RentalRecord.objects.filter(
         status=RentalRecord.Status.ACTIVE
-    ).count()
+    )
+    active_rentals = active_rental_qs.count()
+    oldest_rented_at = (
+        active_rental_qs
+        .order_by('rented_at')
+        .values_list('rented_at', flat=True)
+        .first()
+    )
+    longest_rental_display = (
+        _format_duration(now - oldest_rented_at)
+        if oldest_rented_at else None
+    )
 
     # ── Chart Data ─────────────────────────────────────────────────
     daily_labels,   daily_data   = _daily_revenue_last_30()
@@ -170,11 +225,17 @@ def index(request):
         .order_by('-created_at')[:7]
     )
 
-    todays_bookings = (
+    now_time = timezone.localtime(now).time()
+    todays_bookings = list(
         Booking.objects
         .filter(
             date=today,
-            status__in=[Booking.Status.CONFIRMED, Booking.Status.COMPLETED]
+            status__in=[
+                Booking.Status.PENDING,
+                Booking.Status.CONFIRMED,
+                Booking.Status.COMPLETED,
+            ],
+            end_time__gt=now_time,
         )
         .select_related('court', 'user')
         .prefetch_related('slots')
@@ -201,8 +262,14 @@ def index(request):
         'last_tx_amount':   last_tx_amount,
         'last_tx_label':    last_tx_label,
         'month_revenue':    month_revenue,
+        'month_change_pct': month_change_pct,
+        'month_change_up':  month_change_up,
+        'prev_month_label': prev_month_end.strftime('%b'),
         'bookings_today':   bookings_today,
+        'bookings_completed_today': bookings_completed_today,
+        'bookings_pending_today':   bookings_pending_today,
         'active_rentals':   active_rentals,
+        'longest_rental_display': longest_rental_display,
 
         # Charts (passed as Python lists — serialized in template)
         'daily_labels':   daily_labels,

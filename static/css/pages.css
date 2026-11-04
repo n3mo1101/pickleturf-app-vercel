@@ -218,9 +218,12 @@
 /* Primary metric — navy gradient hero */
 .card.kpi-hero {
   padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  column-gap: 18px;
+  align-items: stretch;
   position: relative;
   overflow: hidden;
   min-height: 128px;
@@ -228,20 +231,38 @@
   background: linear-gradient(125deg, var(--pt-navy) 0%, var(--pt-navy-light) 70%, var(--pt-navy-dark) 100%);
   border: none;
 }
+.kpi-hero-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+.kpi-hero-spark {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  height: 148px;
+  max-height: 148px;
+  align-self: center;
+  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
+}
+.kpi-hero-spark canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
 .kpi-hero-top {
   display: flex;
   align-items: center;
   gap: 10px;
   position: relative;
   z-index: 1;
-}
-.kpi-hero .kpi-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(255,255,255,.14);
-  color: #fff;
-  font-size: 1rem;
 }
 .kpi-hero .kpi-label {
   font-size: .85rem;
@@ -274,6 +295,7 @@
   z-index: 1;
 }
 .kpi-hero-split {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
@@ -293,15 +315,6 @@
   font-weight: 700;
   color: #fff;
   margin-top: 3px;
-}
-.kpi-hero-ghost {
-  position: absolute;
-  right: 16px;
-  bottom: -18px;
-  font-size: 6.5rem;
-  line-height: 1;
-  color: rgba(255,255,255,.07);
-  pointer-events: none;
 }
 
 /* Stacked secondary metrics — navy accents */
@@ -324,19 +337,41 @@
   min-width: 0;
 }
 .kpi-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  font-size: .8rem;
   flex-shrink: 0;
-  background: var(--navy-soft);
+  /* background: var(--navy-soft); */
   color: var(--pt-navy);
 }
 [data-theme="dark"] .kpi-icon { color: #C7D2E5; }
-.kpi-meta { min-width: 0; width: 100%; flex: 0 1 auto; }
+.kpi-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  /* gap: 6px 10px; */
+  min-width: 0;
+  width: 100%;
+  flex: 0 1 auto;
+}
+.kpi-meta-main { min-width: 0; }
+.kpi-row-extra {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.kpi-row-extra .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: .7rem;
+}
 .kpi-row .kpi-label {
   font-size: .82rem;
   font-weight: 600;
@@ -352,11 +387,34 @@
   margin-top: 1px;
   color: var(--text);
 }
+.kpi-fraction {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.kpi-fraction-sep {
+  color: var(--text-muted);
+  font-weight: 600;
+  opacity: .6;
+}
+.kpi-fraction-total {
+  font-size: .82em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .kpi-row .kpi-note {
   font-size: .75rem;
   color: var(--text-muted);
   margin-top: 1px;
 }
+
+/* Today's bookings — scrollable compact list */
+.today-bookings-body {
+  max-height: 21.5rem;
+  overflow-y: auto;
+}
+.booking-user  { font-size: .72rem; }
+.booking-price { font-size: .75rem; }
 
 /* Daily revenue range toggle */
 .btn-range .btn { font-size: .8rem; }
@@ -372,8 +430,14 @@
 }
 @media (max-width: 575.98px) {
   .kpi-stack { grid-template-columns: 1fr; gap: 12px; }
-  .card.kpi-hero { min-height: 0; padding: 18px; }
-  .kpi-hero-ghost { font-size: 5rem; right: 10px; }
+  .card.kpi-hero {
+    min-height: 0;
+    padding: 18px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+  .kpi-hero-spark { display: none; }
+  .kpi-hero-split { grid-column: 1; }
 }
 
 /* Description truncation in tables */

@@ -49,6 +49,7 @@
   --chart-tick:    #6B7E9F;
   --chart-accent:  #F5C518;
   --chart-primary: #1B2A4A;
+  --chart-primary-hover: #2C3E6B;
   --chart-fill:    rgba(27,42,74,.14);
 
   /* Sidebar */
@@ -121,6 +122,7 @@
   --chart-grid:   rgba(255,255,255,.07);
   --chart-tick:   #96A5C0;
   --chart-primary:#93A8CE;
+  --chart-primary-hover: #B7C6E3;
   --chart-fill:   rgba(147,168,206,.18);
 }
 
