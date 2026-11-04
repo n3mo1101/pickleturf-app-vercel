@@ -13,6 +13,24 @@ def _format_time(value):
     return value.strftime('%I:%M %p').lstrip('0')
 
 
+def _is_consecutive(slots):
+    """True when every slot continues directly from the previous one."""
+    return all(
+        slots[i - 1].end_time == slots[i].start_time
+        for i in range(1, len(slots))
+    )
+
+
+def _first_run_end(slots):
+    """End time of the first contiguous run of slots."""
+    end_time = slots[0].end_time
+    for slot in slots[1:]:
+        if slot.start_time != end_time:
+            break
+        end_time = slot.end_time
+    return end_time
+
+
 class Booking(models.Model):
     """A reservation header covering one or more hourly court slots."""
 
@@ -102,21 +120,29 @@ class Booking(models.Model):
         return self.slots.count()
 
     @property
-    def time_summary(self):
-        """Human-readable slot summary used in tables."""
+    def is_consecutive(self):
+        """True when every slot continues directly from the previous one."""
+        return _is_consecutive(list(self.slots.all()))
+
+    @property
+    def first_time_range(self):
+        """First contiguous run, used for the compact table summary."""
         slots = list(self.slots.all())
         if not slots:
             return f'{_format_time(self.start_time)} – {_format_time(self.end_time)}'
 
-        if len(slots) == 1:
-            slot = slots[0]
-            return f'{_format_time(slot.start_time)} – {_format_time(slot.end_time)}'
-
-        consecutive = all(
-            slots[i - 1].end_time == slots[i].start_time
-            for i in range(1, len(slots))
+        return (
+            f'{_format_time(slots[0].start_time)} – '
+            f'{_format_time(_first_run_end(slots))}'
         )
-        if consecutive:
+
+    @property
+    def time_summary(self):
+        """Full summary used in descriptions and confirmations."""
+        slots = list(self.slots.all())
+        if not slots:
+            return f'{_format_time(self.start_time)} – {_format_time(self.end_time)}'
+        if _is_consecutive(slots):
             return (
                 f'{_format_time(slots[0].start_time)} – '
                 f'{_format_time(slots[-1].end_time)}'
@@ -127,9 +153,7 @@ class Booking(models.Model):
             for s in slots[:2]
         )
         remaining = len(slots) - 2
-        if remaining:
-            shown += f' +{remaining} more'
-        return shown
+        return shown + (f' +{remaining} more' if remaining else '')
 
     def sync_summary_from_slots(self):
         """Recompute the denormalized summary fields from child slots."""

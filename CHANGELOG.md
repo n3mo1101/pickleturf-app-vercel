@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-05 — Compact booking time summaries
+
+### Changed
+- Non-consecutive multi-slot bookings now show only their first contiguous time range in booking tables
+- Added an `NC` badge beside the slot count to flag non-consecutive selections
+- Full time summaries are retained for transaction descriptions and cancellation confirmations
+
 ## 2026-11-04 — Multi-slot reservations
 
 ### Added

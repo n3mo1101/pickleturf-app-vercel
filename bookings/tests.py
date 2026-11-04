@@ -251,6 +251,40 @@ class BookingServiceTests(TestCase):
         )
         self.assertEqual(booking.time_summary, '9:00 AM – 11:00 AM')
 
+    def test_first_time_range_for_non_consecutive_slots(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[time(8, 0), time(13, 0), time(17, 0)],
+        )
+        self.assertFalse(booking.is_consecutive)
+        self.assertEqual(booking.first_time_range, '8:00 AM – 9:00 AM')
+        self.assertEqual(
+            booking.time_summary,
+            '8:00 AM–9:00 AM, 1:00 PM–2:00 PM +1 more',
+        )
+
+    def test_first_time_range_stops_at_first_gap(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[time(8, 0), time(9, 0), time(13, 0)],
+        )
+        self.assertFalse(booking.is_consecutive)
+        self.assertEqual(booking.first_time_range, '8:00 AM – 10:00 AM')
+
+    def test_first_time_range_for_consecutive_slots(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[self.slot_9am, self.slot_10am],
+        )
+        self.assertTrue(booking.is_consecutive)
+        self.assertEqual(booking.first_time_range, '9:00 AM – 11:00 AM')
+
     # ── Cancellation ──────────────────────────────────────────
 
     def test_cancel_future_confirmed_booking(self):

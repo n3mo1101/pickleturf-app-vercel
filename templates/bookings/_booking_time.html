@@ -1,8 +1,13 @@
 {% if b.slot_count > 1 %}
 <details class="booking-slots">
     <summary class="d-inline-flex align-items-center gap-1">
-        {{ b.time_summary }}
+        {{ b.first_time_range }}
         <span class="badge bg-secondary">{{ b.slot_count }} slots</span>
+        {% if not b.is_consecutive %}
+        <span class="badge bg-secondary" title="Non-consecutive slots">
+            NC<span class="visually-hidden"> (non-consecutive slots)</span>
+        </span>
+        {% endif %}
     </summary>
     <ul class="list-unstyled small text-muted mb-0 mt-1">
         {% for slot in b.slots.all %}
