@@ -30,6 +30,7 @@ def _customer_home(request):
             status__in=['confirmed', 'pending']
         )
         .select_related('court')
+        .prefetch_related('slots')
         .order_by('date', 'start_time')[:6]
     )
 

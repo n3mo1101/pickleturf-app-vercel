@@ -49,7 +49,7 @@
                 <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
                 <td data-label="Court">{{ b.court.name }}</td>
                 <td data-label="Time" class="text-nowrap">
-                    {{ b.start_time|time:"g:i A" }} – {{ b.end_time|time:"g:i A" }}
+                    {% include 'bookings/_booking_time.html' with b=b %}
                 </td>
                 <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
                 <td data-label="Status">
@@ -95,7 +95,7 @@
                                       action="{% url 'bookings:cancel' b.pk %}"
                                       data-pt-confirm
                                       data-pt-confirm-title="Cancel booking"
-                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} at {{ b.start_time|time:"g:i A" }} will be released."
+                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} ({{ b.time_summary }}) will be released."
                                       data-pt-confirm-label="Cancel booking"
                                       data-pt-confirm-class="btn-danger">
                                     {% csrf_token %}
@@ -121,7 +121,7 @@
                                       action="{% url 'bookings:cancel' b.pk %}"
                                       data-pt-confirm
                                       data-pt-confirm-title="Cancel booking"
-                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} at {{ b.start_time|time:"g:i A" }} will be released."
+                                      data-pt-confirm-body="{{ b.court.name }} on {{ b.date|date:"M d, Y" }} ({{ b.time_summary }}) will be released."
                                       data-pt-confirm-label="Cancel booking"
                                       data-pt-confirm-class="btn-danger">
                                     {% csrf_token %}

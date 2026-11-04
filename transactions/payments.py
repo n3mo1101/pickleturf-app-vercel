@@ -42,11 +42,51 @@ def _line_item_name(transaction):
     label = transaction.get_tx_type_display()
     if transaction.booking:
         b = transaction.booking
-        return f'{label} – {b.court} {b.date:%b %d} {b.start_time:%I:%M %p}'
+        return f'{label} – {b.court} {b.date:%b %d} {b.time_summary}'
     if transaction.openplay:
         p = transaction.openplay
         return f'{label} – {p.session.title}'
     return label
+
+
+def _line_items_for_transaction(transaction):
+    """
+    Build checkout line items.
+
+    A booking reservation with multiple slots gets one line item per slot
+    so the checkout page matches what the customer selected. If the slot
+    prices do not add up to the transaction amount, fall back to one total
+    line item to avoid a provider-side amount mismatch.
+    """
+    if transaction.booking:
+        booking = transaction.booking
+        slots = list(booking.slots.all())
+        if slots:
+            items = []
+            total_centavos = 0
+            for slot in slots:
+                amount = int(slot.price * 100)
+                total_centavos += amount
+                items.append({
+                    'name': (
+                        f'{transaction.get_tx_type_display()} – '
+                        f'{booking.court} {booking.date:%b %d} '
+                        f'{slot.start_time:%I:%M %p}–'
+                        f'{slot.end_time:%I:%M %p}'
+                    ),
+                    'amount': amount,
+                    'currency': 'PHP',
+                    'quantity': 1,
+                })
+            if total_centavos == int(transaction.amount * 100):
+                return items
+
+    return [{
+        'name': _line_item_name(transaction),
+        'amount': int(transaction.amount * 100),  # centavos
+        'currency': 'PHP',
+        'quantity': 1,
+    }]
 
 
 def _redirect_url(base_url, path):
@@ -95,12 +135,7 @@ def create_checkout(transaction, base_url=None):
     payload = {
         'data': {
             'attributes': {
-                'line_items': [{
-                    'name': _line_item_name(transaction),
-                    'amount': int(transaction.amount * 100),  # centavos
-                    'currency': 'PHP',
-                    'quantity': 1,
-                }],
+                'line_items': _line_items_for_transaction(transaction),
                 'payment_method_types': ['gcash', 'card'],
                 'success_url': _redirect_url(base_url, f'/transactions/{transaction.pk}/result/success/'),
                 'cancel_url': _redirect_url(base_url, f'/transactions/{transaction.pk}/result/cancelled/'),

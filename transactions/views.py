@@ -92,7 +92,7 @@ def transaction_list_view(request):
 def mark_paid_view(request, pk):
     """
     Manually mark a transaction as Paid (on-site / manual payments).
-    A linked booking is only completed if its slot has already passed.
+    A linked booking is only completed after its last slot has passed.
     """
     from datetime import datetime as dt
     from django.utils import timezone
@@ -106,22 +106,28 @@ def mark_paid_view(request, pk):
         transaction.save(update_fields=['payment_status', 'paid_at'])
 
         booking_completed = False
+        booking_confirmed = False
         if transaction.booking:
             booking = transaction.booking
+            # A reservation is complete only after its last slot ends.
             slot_dt = timezone.make_aware(
-                dt.combine(booking.date, booking.start_time)
+                dt.combine(booking.date, booking.end_time)
             )
+            if booking.status == Booking.Status.PENDING:
+                booking.status = Booking.Status.CONFIRMED
+                booking.save(update_fields=['status', 'updated_at'])
+                booking_confirmed = True
             if slot_dt <= timezone.now() and booking.status not in (
                 Booking.Status.COMPLETED, Booking.Status.CANCELLED
             ):
                 booking.status = Booking.Status.COMPLETED
-                booking.save(update_fields=['status'])
+                booking.save(update_fields=['status', 'updated_at'])
                 booking_completed = True
             messages.success(
                 request,
                 f'Transaction #{pk} marked as paid.'
-                + (' Booking #{booking.pk} completed.'
-                   if booking_completed else ''),
+                + (' Booking confirmed.' if booking_confirmed else '')
+                + (' Booking completed.' if booking_completed else ''),
             )
         else:
             messages.success(request, f'Transaction #{pk} marked as paid.')

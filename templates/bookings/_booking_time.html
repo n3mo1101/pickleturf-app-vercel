@@ -1,0 +1,19 @@
+{% if b.slot_count > 1 %}
+<details class="booking-slots">
+    <summary class="d-inline-flex align-items-center gap-1">
+        {{ b.time_summary }}
+        <span class="badge bg-secondary">{{ b.slot_count }} slots</span>
+    </summary>
+    <ul class="list-unstyled small text-muted mb-0 mt-1">
+        {% for slot in b.slots.all %}
+        <li>
+            {{ slot.start_time|time:"g:i A" }} –
+            {{ slot.end_time|time:"g:i A" }}
+            · ₱{{ slot.price|floatformat:2 }}
+        </li>
+        {% endfor %}
+    </ul>
+</details>
+{% else %}
+{{ b.time_summary }}
+{% endif %}

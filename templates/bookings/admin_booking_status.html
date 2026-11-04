@@ -13,7 +13,17 @@
                     <li class="list-group-item"><strong>Customer:</strong> {{ booking.user.full_name }}</li>
                     <li class="list-group-item"><strong>Court:</strong> {{ booking.court.name }}</li>
                     <li class="list-group-item"><strong>Date:</strong> {{ booking.date|date:"F j, Y" }}</li>
-                    <li class="list-group-item"><strong>Time:</strong> {{ booking.start_time|time:"g:i A" }}</li>
+                    <li class="list-group-item">
+                        <strong>Time:</strong>
+                        {% for slot in booking.slots.all %}
+                            {{ slot.start_time|time:"g:i A" }} –
+                            {{ slot.end_time|time:"g:i A" }}
+                            {% if not forloop.last %}, {% endif %}
+                        {% empty %}
+                            {{ booking.start_time|time:"g:i A" }} –
+                            {{ booking.end_time|time:"g:i A" }}
+                        {% endfor %}
+                    </li>
                     <li class="list-group-item"><strong>Notes:</strong> {{ booking.notes }}</li>
                     <li class="list-group-item"><strong>Current Status:</strong>
                         <span class="badge bg-secondary">{{ booking.get_status_display }}</span>

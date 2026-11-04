@@ -103,8 +103,8 @@
                                 </div>
                             </div>
                             <div class="text-end">
-                                <div class="small">
-                                    {{ b.start_time|time:"g:i A" }}
+                                <div class="small text-nowrap">
+                                    {% include 'bookings/_booking_time.html' with b=b %}
                                 </div>
                                 <div class="text-ok fw-semibold"
                                      style="font-size:.75rem;">

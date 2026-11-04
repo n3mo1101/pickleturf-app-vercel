@@ -1,10 +1,9 @@
-from datetime import date, datetime
+from datetime import date
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import models
-from django.utils import timezone
 from django.views.decorators.http import require_GET
 from courts.models import Court
 from accounts.decorators import admin_or_staff_required
@@ -79,30 +78,26 @@ def booking_create_view(request):
                 payment_method = 'onsite'
             elif not payments_enabled():
                 payment_method = 'onsite'
-            created = []
-            errors  = []
 
-            for slot_str in slots:
-                try:
-                    t = datetime.strptime(slot_str, '%H:%M:%S').time()
-                    booking = services.create_booking(
-                        user=request.user,
-                        court=data['court'],
-                        selected_date=data['date'],
-                        start_time=t,
-                        notes=data.get('notes', ''),
-                        payment_method=payment_method,
-                    )
-                    created.append(booking)
-                except ValidationError as e:
-                    errors.append(str(e.message))
-
-            if created:
-                total_price = sum(b.price for b in created)
+            try:
+                booking = services.create_booking(
+                    user=request.user,
+                    court=data['court'],
+                    selected_date=data['date'],
+                    start_times=slots,
+                    notes=data.get('notes', ''),
+                    payment_method=payment_method,
+                )
+            except ValidationError as e:
+                form.add_error(None, str(e))
+                messages.error(request, str(e))
+            else:
+                slot_count  = booking.slot_count
+                total_price = booking.price
                 if payment_method == 'online' and payments_enabled() and not is_admin:
                     messages.success(
                         request,
-                        f'✅ {len(created)} slot(s) reserved on '
+                        f'✅ {slot_count} slot(s) reserved on '
                         f'{parsed_date.strftime("%b %d, %Y")} '
                         f'for {data["court"]}. '
                         f'Total: ₱{total_price} — redirecting to payment...'
@@ -110,31 +105,33 @@ def booking_create_view(request):
                 else:
                     messages.success(
                         request,
-                        f'✅ {len(created)} slot(s) booked on '
+                        f'✅ {slot_count} slot(s) booked on '
                         f'{parsed_date.strftime("%b %d, %Y")} '
                         f'for {data["court"]}. '
                         f'Total: ₱{total_price} — confirmed, pay on-site.'
                     )
-            for err in errors:
-                messages.warning(request, f'⚠️ Skipped: {err}')
 
-            if created:
                 if is_admin:
                     return redirect('bookings:admin_list')
-                # Online → redirect directly to PayMongo checkout for first booking
+                # One transaction covers the whole reservation.
                 if payment_method == 'online' and payments_enabled():
                     try:
-                        first_tx = created[0].transaction
-                        # If multiple slots, remaining Pay Now buttons stay on My Bookings
-                        if len(created) > 1:
-                            messages.info(request, f'{len(created)-1} other slot(s) can be paid via "Pay Now" on My Bookings.')
                         from django.conf import settings as _settings
-                        base_url = _settings.SITE_URL or request.build_absolute_uri('/')[:-1]
+                        base_url = (
+                            _settings.SITE_URL
+                            or request.build_absolute_uri('/')[:-1]
+                        )
                         from transactions.payments import create_checkout
-                        checkout_url = create_checkout(first_tx, base_url=base_url)
+                        checkout_url = create_checkout(
+                            booking.transaction, base_url=base_url
+                        )
                         return redirect(checkout_url)
                     except Exception as e:
-                        messages.warning(request, f'Online checkout not available: {e}. Use "Pay Now" on My Bookings.')
+                        messages.warning(
+                            request,
+                            f'Online checkout not available: {e}. '
+                            f'Use "Pay Now" on My Bookings.'
+                        )
                 return redirect('bookings:my_bookings')
 
     else:
@@ -168,6 +165,7 @@ def my_bookings_view(request):
         Booking.objects
         .filter(user=request.user)
         .select_related('court')
+        .prefetch_related('slots')
         .order_by('-date', '-start_time')
     )
 
@@ -220,7 +218,12 @@ def booking_cancel_view(request, pk):
 def admin_booking_list_view(request):
     """Admin view of all bookings with filters."""
     services.auto_update_booking_statuses()  # Keep statuses current on admin page load
-    bookings = Booking.objects.select_related('court', 'user').order_by('-date', '-start_time')
+    bookings = (
+        Booking.objects
+        .select_related('court', 'user')
+        .prefetch_related('slots')
+        .order_by('-date', '-start_time')
+    )
 
     # Filters
     status_filter = request.GET.get('status')
@@ -269,9 +272,7 @@ def admin_booking_cancel_view(request, pk):
 
 @admin_or_staff_required
 def admin_booking_status_view(request, pk):
-    """Admin updates booking status and syncs the linked transaction."""
-    from transactions.models import Transaction
-
+    """Admin updates booking status and syncs slots/transaction."""
     booking = get_object_or_404(Booking, pk=pk)
     next_url = safe_next_url(
         request,
@@ -281,29 +282,11 @@ def admin_booking_status_view(request, pk):
     if request.method == 'POST':
         new_status = request.POST.get('status')
 
-        if new_status not in dict(Booking.Status.choices):
-            messages.error(request, 'Invalid status.')
-            return redirect(next_url or 'bookings:admin_list')
-
-        booking.status = new_status
-        if new_status == Booking.Status.CANCELLED:
-            booking.cancelled_at = timezone.now()
-        booking.save(update_fields=['status', 'cancelled_at'])
-
-        # ── Sync linked transaction payment status ─────────────────
         try:
-            tx = booking.transaction
-            if new_status == Booking.Status.CONFIRMED:
-                tx.payment_status = Transaction.PaymentStatus.PENDING
-            elif new_status == Booking.Status.COMPLETED:
-                tx.payment_status = Transaction.PaymentStatus.PAID
-            elif new_status == Booking.Status.CANCELLED:
-                tx.payment_status = Transaction.PaymentStatus.REFUNDED
-            else:
-                tx.payment_status = Transaction.PaymentStatus.WAIVED
-            tx.save(update_fields=['payment_status'])
-        except Exception:
-            pass   # no transaction linked — safe to ignore
+            services.set_booking_status(booking, new_status)
+        except ValidationError as e:
+            messages.error(request, str(e))
+            return redirect(next_url or 'bookings:admin_list')
 
         messages.success(
             request,
@@ -336,6 +319,7 @@ def staff_bookings_view(request):
         Booking.objects
         .filter(created_by=request.user)
         .select_related('court', 'user')
+        .prefetch_related('slots')
         .order_by('-date', '-start_time')
     )
 

@@ -66,4 +66,5 @@ Rules:
 - Category order: `Added` → `Changed` → `Fixed` → `Removed`; omit empty categories.
 - Bullets: one line each, sentence case, no trailing period.
 - Use backticks for code identifiers, paths, commands, and routes.
+- Add/update only before commits (once all changes is finalized) or when explicitly instructed.
 - Add/update the entry in the same commit or PR as the user-visible change.

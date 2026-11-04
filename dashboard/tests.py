@@ -51,7 +51,7 @@ class ExportCsvTests(TestCase):
         lines = resp.content.decode().strip().splitlines()
         self.assertEqual(
             lines[0],
-            'ID,Date,Type,Amount,Payment Status,Description,Created By')
+            'ID,Date,Type,Amount,Payment Status,Description,Slots,Created By')
         self.assertEqual(len(lines), 2)
 
     def test_range_excludes_out_of_range(self):

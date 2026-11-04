@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-11-04 — Multi-slot reservations
+
+### Added
+- `BookingSlot` model with a partial unique constraint on active court/date/time slots
+- Data migration that backfills one `BookingSlot` per existing `Booking`
+- One `Transaction` per reservation, covering every selected time slot
+- Per-slot PayMongo checkout line items for multi-slot reservations
+- Expandable time-slot summaries in customer, staff, and admin booking tables
+- `Slots` column in the transactions CSV export
+
+### Changed
+- `Booking` now represents a reservation header with summary start/end times and total price
+- Availability, conflict checks, and slot generation now query `BookingSlot`
+- Multi-slot bookings are created atomically; one unavailable slot rejects the whole reservation
+- Admin status updates, cancellations, and auto-completion now operate on the whole reservation
+- Booking and transaction totals remain per reservation; `total bookings` now counts reservations rather than slots
+
+### Fixed
+- Online payment for multi-slot bookings now covers every selected slot instead of only the first
+- Cancelling an unpaid online booking waives its transaction instead of marking it refunded
+- Admin mark-paid confirms a pending booking and completes it only after the last slot ends
+
+### Removed
+- Per-slot booking creation and the “pay the remaining slots later” flow
+
 ## 2026-11-02 — Admin form modals
 
 ### Added

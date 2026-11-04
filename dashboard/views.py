@@ -177,6 +177,7 @@ def index(request):
             status__in=[Booking.Status.CONFIRMED, Booking.Status.COMPLETED]
         )
         .select_related('court', 'user')
+        .prefetch_related('slots')
         .order_by('start_time')
     )
 
@@ -282,15 +283,22 @@ def export_csv(request):
     if kind == 'transactions':
         rows = _filter_by_range(
             Transaction.objects
-            .select_related('user', 'created_by')
+            .select_related('user', 'created_by', 'booking')
+            .prefetch_related('booking__slots')
             .order_by('-created_at'),
             'created_at__date', start, end,
         )
         writer.writerow([
             'ID', 'Date', 'Type', 'Amount',
-            'Payment Status', 'Description', 'Created By',
+            'Payment Status', 'Description', 'Slots', 'Created By',
         ])
         for tx in rows:
+            slots = ''
+            if tx.booking:
+                slots = '; '.join(
+                    f'{slot.start_time:%H:%M}-{slot.end_time:%H:%M}'
+                    for slot in tx.booking.slots.all()
+                )
             writer.writerow([
                 tx.pk,
                 tx.created_at.strftime('%Y-%m-%d %H:%M'),
@@ -298,6 +306,7 @@ def export_csv(request):
                 tx.amount,
                 tx.get_payment_status_display(),
                 strip_tx_prefix(tx.description),
+                slots,
                 tx.created_by.email if tx.created_by else '—',
             ])
 

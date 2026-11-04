@@ -76,8 +76,7 @@
                             <div class="text-muted small">
                                 <i class="bi bi-calendar3 me-1"></i>
                                 {{ b.date|date:"D, M d" }} ·
-                                {{ b.start_time|time:"g:i A" }} –
-                                {{ b.end_time|time:"g:i A" }}
+                                {% include 'bookings/_booking_time.html' with b=b %}
                             </div>
                         </div>
                         <div class="text-end">

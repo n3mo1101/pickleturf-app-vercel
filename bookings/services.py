@@ -1,9 +1,12 @@
 from datetime import date, time, datetime, timedelta
+
 from django.conf import settings
-from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+
 from courts.models import Court
-from .models import Booking
+from .models import Booking, BookingSlot
 
 
 # ── Slot Generation ────────────────────────────────────────────────────────────
@@ -29,16 +32,16 @@ def get_availability(selected_date):
     with per-court status 'available' | 'booked' | 'past'.
     Used to render the booking grid.
     """
-    from datetime import datetime, timedelta
     courts = Court.objects.filter(is_active=True)
     slots  = get_time_slots()
 
-    bookings = Booking.objects.filter(
+    booked_slots = BookingSlot.objects.filter(
         date=selected_date,
-        status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED]
+        is_active=True,
+        booking__status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED],
     ).values('court_id', 'start_time')
 
-    booked_set = {(b['court_id'], b['start_time']) for b in bookings}
+    booked_set = {(s['court_id'], s['start_time']) for s in booked_slots}
 
     grid = {}
     for slot_time, slot_label in slots:
@@ -63,11 +66,12 @@ def get_availability(selected_date):
 
 def is_slot_available(court, selected_date, start_time):
     """Check if a specific court/date/time is free."""
-    return not Booking.objects.filter(
+    return not BookingSlot.objects.filter(
         court=court,
         date=selected_date,
         start_time=start_time,
-        status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED]
+        is_active=True,
+        booking__status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED],
     ).exists()
 
 
@@ -80,50 +84,105 @@ def is_past_slot(selected_date, start_time):
 
 # ── Booking Creation ───────────────────────────────────────────────────────────
 
-def create_booking(user, court, selected_date, start_time, created_by=None, notes='', payment_method='onsite'):
+def _slot_end(start_time):
+    dummy = datetime(2000, 1, 1)
+    return (
+        datetime.combine(dummy, start_time)
+        + timedelta(hours=settings.BOOKING_SLOT_HOURS)
+    ).time()
+
+
+def _coerce_time(value):
+    if isinstance(value, time):
+        return value
+    return datetime.strptime(str(value), '%H:%M:%S').time()
+
+
+def create_booking(
+    user,
+    court,
+    selected_date,
+    start_times=None,
+    created_by=None,
+    notes='',
+    payment_method='onsite',
+    start_time=None,
+):
     """
-    Create a booking after validating availability.
-    payment_method: 'onsite' (default) → CONFIRMED, 'online' → PENDING until PayMongo webhook.
-    Raises ValidationError on conflict.
+    Create a reservation covering one or more time slots atomically.
+
+    payment_method: 'onsite' (default) → CONFIRMED, 'online' → PENDING
+    until PayMongo webhook. Raises ValidationError on any conflict.
     """
-    if is_past_slot(selected_date, start_time):
-        raise ValidationError('Cannot book a slot in the past.')
+    if start_times is None:
+        start_times = [start_time] if start_time is not None else []
 
-    if not is_slot_available(court, selected_date, start_time):
-        raise ValidationError(
-            f'{court.name} is already booked on '
-            f'{selected_date.strftime("%b %d")} at '
-            f'{start_time.strftime("%I:%M %p")}.'
-        )
+    times = sorted({_coerce_time(value) for value in start_times})
+    if not times:
+        raise ValidationError('Please select at least one slot.')
 
-    # Auto-calculate price based on time bracket
-    price = calculate_slot_price(start_time)
+    # Validate every slot before creating anything.
+    for slot_time in times:
+        if is_past_slot(selected_date, slot_time):
+            raise ValidationError('Cannot book a slot in the past.')
+        if not is_slot_available(court, selected_date, slot_time):
+            raise ValidationError(
+                f'{court.name} is already booked on '
+                f'{selected_date.strftime("%b %d")} at '
+                f'{slot_time.strftime("%I:%M %p")}.'
+            )
 
-    # Decide status/provider based on payment method
+    prices = {slot_time: calculate_slot_price(slot_time) for slot_time in times}
+    total_price = sum(prices.values())
+
     from transactions.payments import payments_enabled
     is_online = (payment_method == 'online' and payments_enabled())
 
-    booking = Booking.objects.create(
-        user=user,
-        court=court,
-        date=selected_date,
-        start_time=start_time,
-        price=price,
-        status=Booking.Status.PENDING if is_online else Booking.Status.CONFIRMED,
-        created_by=created_by or user,
-        notes=notes,
-    )
+    summary_start = times[0]
+    summary_end = max(_slot_end(slot_time) for slot_time in times)
 
-    _create_booking_transaction(
-        booking,
-        provider='paymongo' if is_online else 'onsite',
-    )
+    try:
+        with transaction.atomic():
+            booking = Booking.objects.create(
+                user=user,
+                court=court,
+                date=selected_date,
+                start_time=summary_start,
+                end_time=summary_end,
+                price=total_price,
+                status=(
+                    Booking.Status.PENDING if is_online
+                    else Booking.Status.CONFIRMED
+                ),
+                created_by=created_by or user,
+                notes=notes,
+            )
+
+            for slot_time in times:
+                BookingSlot.objects.create(
+                    booking=booking,
+                    court=court,
+                    date=selected_date,
+                    start_time=slot_time,
+                    price=prices[slot_time],
+                )
+
+            _create_booking_transaction(
+                booking,
+                provider='paymongo' if is_online else 'onsite',
+            )
+    except IntegrityError as exc:
+        raise ValidationError(
+            'One or more selected slots were just booked. '
+            'Please choose different slots.'
+        ) from exc
+
     return booking
 
 
 def _create_booking_transaction(booking, provider='onsite'):
     """
-    Auto-create a pending transaction when a booking is made.
+    Create the single pending transaction for a reservation.
     It only counts toward revenue once paid (online or on-site).
     """
     from transactions.models import Transaction
@@ -138,7 +197,10 @@ def _create_booking_transaction(booking, provider='onsite'):
         booking=booking,
         payment_status=Transaction.PaymentStatus.PENDING,
         provider=provider_value,
-        description=f'{booking.court} on {booking.date} at {booking.start_time}',
+        description=(
+            f'{booking.court} on {booking.date} '
+            f'({booking.slot_count} slot(s), {booking.time_summary})'
+        ),
         created_by=booking.created_by,
     )
 
@@ -147,33 +209,136 @@ def _create_booking_transaction(booking, provider='onsite'):
 
 def cancel_booking(booking, cancelled_by=None):
     """
-    Cancel a booking if it's still cancellable.
+    Cancel a reservation if it's still cancellable.
     Raises ValidationError if not allowed.
     """
     if not booking.is_cancellable:
         raise ValidationError('This booking cannot be cancelled.')
 
-    booking.cancel()
+    from transactions.models import Transaction
 
-    # Mark linked transaction as refunded
-    if hasattr(booking, 'transaction'):
-        booking.transaction.payment_status = 'refunded'
-        booking.transaction.save(update_fields=['payment_status'])
+    with transaction.atomic():
+        booking.cancel()
+
+        try:
+            tx = booking.transaction
+        except Transaction.DoesNotExist:
+            tx = None
+        if tx:
+            tx.payment_status = (
+                Transaction.PaymentStatus.REFUNDED
+                if tx.payment_status == Transaction.PaymentStatus.PAID
+                else Transaction.PaymentStatus.WAIVED
+            )
+            tx.save(update_fields=['payment_status', 'updated_at'])
 
     return booking
 
 
-# ── Court Availability ───────────────────────────────────────────────────────────────
+# ── Status Changes ─────────────────────────────────────────────────────────────
+
+def _sync_transaction_status(booking, new_status):
+    """Keep the single linked transaction in step with the booking."""
+    from transactions.models import Transaction
+
+    try:
+        tx = booking.transaction
+    except Transaction.DoesNotExist:
+        return
+
+    if new_status == Booking.Status.COMPLETED:
+        tx.payment_status = Transaction.PaymentStatus.PAID
+    elif new_status == Booking.Status.CANCELLED:
+        tx.payment_status = (
+            Transaction.PaymentStatus.REFUNDED
+            if tx.payment_status == Transaction.PaymentStatus.PAID
+            else Transaction.PaymentStatus.WAIVED
+        )
+    elif new_status in (Booking.Status.PENDING, Booking.Status.CONFIRMED):
+        if tx.payment_status not in (
+            Transaction.PaymentStatus.PAID,
+            Transaction.PaymentStatus.REFUNDED,
+            Transaction.PaymentStatus.WAIVED,
+        ):
+            tx.payment_status = Transaction.PaymentStatus.PENDING
+
+    tx.save(update_fields=['payment_status', 'updated_at'])
+
+
+def set_booking_status(booking, new_status):
+    """
+    Update a booking's status, keeping slot availability and the linked
+    transaction consistent. Used by the admin status view.
+    """
+    if new_status not in dict(Booking.Status.choices):
+        raise ValidationError('Invalid status.')
+
+    was_cancelled = booking.status == Booking.Status.CANCELLED
+
+    try:
+        with transaction.atomic():
+            if new_status == Booking.Status.CANCELLED:
+                booking.cancel()
+                _sync_transaction_status(booking, new_status)
+                return booking
+
+            if was_cancelled:
+                # Reactivating a cancelled reservation must not steal slots.
+                conflicts = []
+                for slot in booking.slots.all():
+                    if not is_slot_available(
+                        slot.court, slot.date, slot.start_time
+                    ):
+                        conflicts.append(slot)
+                if conflicts:
+                    slot = conflicts[0]
+                    raise ValidationError(
+                        f'Cannot reactivate: {slot.court} is already booked '
+                        f'on {slot.date.strftime("%b %d")} at '
+                        f'{slot.start_time.strftime("%I:%M %p")}.'
+                    )
+                booking.slots.update(is_active=True)
+                booking.cancelled_at = None
+
+            booking.status = new_status
+            booking.save(update_fields=['status', 'cancelled_at', 'updated_at'])
+            _sync_transaction_status(booking, new_status)
+
+            if was_cancelled:
+                # A cancelled checkout session is stale; force a fresh one.
+                from transactions.models import Transaction
+                try:
+                    tx = booking.transaction
+                except Transaction.DoesNotExist:
+                    tx = None
+                if tx and tx.provider_checkout_id:
+                    tx.provider_checkout_id = ''
+                    tx.save(
+                        update_fields=['provider_checkout_id', 'updated_at']
+                    )
+    except IntegrityError as exc:
+        raise ValidationError(
+            'One or more slots were just booked. Please try again.'
+        ) from exc
+
+    return booking
+
+
+# ── Court Availability ─────────────────────────────────────────────────────────
 
 def get_available_slots_for_court(court, selected_date):
-    """Returns list of (value, label, price) for available slots."""
+    """Returns list of (value, label) for available slots."""
     all_slots = get_time_slots()
 
     booked_times = set(
-        Booking.objects.filter(
+        BookingSlot.objects.filter(
             court=court,
             date=selected_date,
-            status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED]
+            is_active=True,
+            booking__status__in=[
+                Booking.Status.PENDING,
+                Booking.Status.CONFIRMED,
+            ],
         ).values_list('start_time', flat=True)
     )
 
@@ -183,7 +348,6 @@ def get_available_slots_for_court(court, selected_date):
             continue
         if is_past_slot(selected_date, slot_time):
             continue
-        price = get_price_for_display(slot_time)
         available.append((
             slot_time.strftime('%H:%M:%S'),
             label,
@@ -192,7 +356,7 @@ def get_available_slots_for_court(court, selected_date):
     return available
 
 
-# ── Automatic Booking Status Update ───────────────────────────────────────────────────────────────
+# ── Automatic Booking Status Update ───────────────────────────────────────────
 
 def auto_update_booking_statuses():
     """
@@ -201,8 +365,8 @@ def auto_update_booking_statuses():
     `update_booking_statuses` management command.
 
     Rules:
-      - CONFIRMED + time passed → COMPLETED, transaction → PAID
-      - PENDING   + time passed → CANCELLED, transaction stays WAIVED
+      - CONFIRMED + last slot passed → COMPLETED, transaction → PAID
+      - PENDING   + last slot passed → CANCELLED, transaction stays WAIVED
     """
     from transactions.models import Transaction
 
@@ -210,7 +374,7 @@ def auto_update_booking_statuses():
 
     stale = Booking.objects.filter(
         status__in=[Booking.Status.CONFIRMED, Booking.Status.PENDING]
-    ).select_related('court')
+    ).select_related('court').prefetch_related('slots')
 
     for booking in stale:
         if not booking.end_time:
@@ -224,33 +388,33 @@ def auto_update_booking_statuses():
 
         if booking.status == Booking.Status.CONFIRMED:
             booking.status = Booking.Status.COMPLETED
-            booking.save(update_fields=['status'])
+            booking.save(update_fields=['status', 'updated_at'])
 
-            # Mark transaction as paid
             try:
-                booking.transaction.payment_status = (
-                    Transaction.PaymentStatus.PAID
-                )
-                booking.transaction.save(update_fields=['payment_status'])
-            except Exception:
+                tx = booking.transaction
+                tx.payment_status = Transaction.PaymentStatus.PAID
+                tx.save(update_fields=['payment_status', 'updated_at'])
+            except Transaction.DoesNotExist:
                 pass
 
         elif booking.status == Booking.Status.PENDING:
             booking.status       = Booking.Status.CANCELLED
             booking.cancelled_at = now
-            booking.save(update_fields=['status', 'cancelled_at'])
+            booking.save(update_fields=['status', 'cancelled_at', 'updated_at'])
+            booking.slots.update(is_active=False)
+
             # Unpaid expired booking — waive the charge (no revenue).
             try:
                 tx = booking.transaction
                 if tx and tx.payment_status != Transaction.PaymentStatus.PAID:
                     tx.payment_status = Transaction.PaymentStatus.WAIVED
-                    tx.save(update_fields=['payment_status'])
-            except Exception:
+                    tx.save(update_fields=['payment_status', 'updated_at'])
+            except Transaction.DoesNotExist:
                 pass
 
 
-#── Pricing Calculation ───────────────────────────────────────────────────────────────
-    
+# ── Pricing Calculation ───────────────────────────────────────────────────────
+
 def calculate_slot_price(start_time, end_time=None):
     """
     Calculate price for a booking slot, handling cross-bracket slots.
@@ -258,7 +422,7 @@ def calculate_slot_price(start_time, end_time=None):
     Settings Config:
       08:00 → 12:00  = ₱300  (entirely in morning bracket)
       12:00 → 05:00  = ₱350  (entirely in afternoon bracket)
-      05:00 → 1:00  = ₱400  (entirely in evening bracket)
+      05:00 → 1:00   = ₱400  (entirely in evening bracket)
     """
     brackets = settings.BOOKING_PRICE_BRACKETS
 
@@ -292,9 +456,11 @@ def calculate_slot_price(start_time, end_time=None):
 
 def get_price_for_display(start_time):
     """Return the price for a single 1-hour slot starting at start_time."""
-    from datetime import datetime, timedelta
     dummy = datetime(2000, 1, 1)
-    end_time = (datetime.combine(dummy, start_time) + timedelta(hours=1)).time()
+    end_time = (
+        datetime.combine(dummy, start_time)
+        + timedelta(hours=settings.BOOKING_SLOT_HOURS)
+    ).time()
     return calculate_slot_price(start_time, end_time)
 
 

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from courts.models import Court
-from bookings.models import Booking
+from bookings.models import Booking, BookingSlot
 from bookings.services import (
     create_booking,
     cancel_booking,
@@ -172,6 +172,85 @@ class BookingServiceTests(TestCase):
             Transaction.PaymentStatus.PENDING
         )
 
+    # ── Multi-slot reservations ───────────────────────────────
+
+    def test_multi_slot_creates_one_booking_and_slots(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[self.slot_9am, self.slot_10am],
+        )
+        self.assertEqual(Booking.objects.count(), 1)
+        self.assertEqual(booking.slots.count(), 2)
+        self.assertEqual(
+            list(booking.slots.values_list('start_time', flat=True)),
+            [self.slot_9am, self.slot_10am],
+        )
+
+    def test_multi_slot_uses_one_transaction_for_total(self):
+        from transactions.models import Transaction
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[self.slot_9am, self.slot_10am],
+        )
+        self.assertEqual(Transaction.objects.filter(booking=booking).count(), 1)
+        tx = booking.transaction
+        self.assertEqual(tx.amount, booking.price)
+        self.assertEqual(
+            booking.price,
+            sum(slot.price for slot in booking.slots.all()),
+        )
+
+    def test_multi_slot_conflict_is_all_or_nothing(self):
+        create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_time=self.slot_10am,
+        )
+        with self.assertRaises(ValidationError):
+            create_booking(
+                user=self.user,
+                court=self.court,
+                selected_date=self.tomorrow,
+                start_times=[self.slot_9am, self.slot_10am],
+            )
+        # The free 9 AM slot must not have been partially booked.
+        self.assertTrue(
+            is_slot_available(self.court, self.tomorrow, self.slot_9am)
+        )
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_multi_slot_cancel_frees_all_slots(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[self.slot_9am, self.slot_10am],
+        )
+        cancel_booking(booking)
+        self.assertTrue(
+            is_slot_available(self.court, self.tomorrow, self.slot_9am)
+        )
+        self.assertTrue(
+            is_slot_available(self.court, self.tomorrow, self.slot_10am)
+        )
+        self.assertFalse(
+            BookingSlot.objects.filter(booking=booking, is_active=True).exists()
+        )
+
+    def test_multi_slot_time_summary_consecutive(self):
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_times=[self.slot_9am, self.slot_10am],
+        )
+        self.assertEqual(booking.time_summary, '9:00 AM – 11:00 AM')
+
     # ── Cancellation ──────────────────────────────────────────
 
     def test_cancel_future_confirmed_booking(self):
@@ -335,6 +414,7 @@ class BookingStatusViewTests(TestCase):
             court=self.court,
             date=date.today() + timedelta(days=1),
             start_time=time(9, 0),
+            end_time=time(10, 0),
             status=Booking.Status.CONFIRMED,
         )
         self.client.force_login(self.staff)
@@ -371,3 +451,21 @@ class BookingStatusViewTests(TestCase):
             },
         )
         self.assertEqual(response.url, reverse('bookings:admin_list'))
+
+    def test_cancelling_multi_slot_booking_deactivates_all_slots(self):
+        booking = create_booking(
+            user=self.customer,
+            court=self.court,
+            selected_date=date.today() + timedelta(days=2),
+            start_times=[time(10, 0), time(11, 0)],
+        )
+        response = self.client.post(
+            reverse('bookings:admin_status', args=[booking.pk]),
+            {'status': Booking.Status.CANCELLED},
+        )
+        self.assertEqual(response.status_code, 302)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.Status.CANCELLED)
+        self.assertFalse(
+            booking.slots.filter(is_active=True).exists()
+        )

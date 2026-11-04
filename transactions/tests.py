@@ -91,6 +91,56 @@ class BookingPaymentTests(BaseTestCase):
         self.assertGreater(tx.amount, 0)
 
     @override_settings(**TEST_KEYS)
+    def test_multi_slot_booking_has_one_transaction(self):
+        b = booking_services.create_booking(
+            user=self.user, court=self.court,
+            selected_date=date.today() + timedelta(days=1),
+            start_times=[dtime(9, 0), dtime(10, 0)],
+            payment_method='online',
+        )
+        self.assertEqual(b.slots.count(), 2)
+        self.assertEqual(
+            Transaction.objects.filter(booking=b).count(), 1
+        )
+        self.assertEqual(b.transaction.amount, b.price)
+
+    @override_settings(**TEST_KEYS)
+    def test_paid_webhook_confirms_multi_slot_booking(self):
+        b = booking_services.create_booking(
+            user=self.user, court=self.court,
+            selected_date=date.today() + timedelta(days=1),
+            start_times=[dtime(9, 0), dtime(10, 0)],
+            payment_method='online',
+        )
+        tx = b.transaction
+        payload = json.loads(json.dumps({
+            'data': {
+                'type': 'checkout_session.payment.paid',
+                'data': {
+                    'id': 'cs_multi_1',
+                    'attributes': {
+                        'reference_number': str(tx.pk),
+                        'payments': [{
+                            'id': 'pay_multi_1',
+                            'attributes': {
+                                'amount': int(tx.amount * 100),
+                                'status': 'paid',
+                                'source': {'type': 'gcash'},
+                            },
+                        }],
+                    },
+                },
+            },
+        }))
+        handled = payments.handle_webhook_payload(payload)
+        self.assertIsNotNone(handled)
+        tx.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertEqual(b.status, Booking.Status.CONFIRMED)
+        self.assertEqual(b.slots.count(), 2)
+
+    @override_settings(**TEST_KEYS)
     def test_paid_webhook_confirms_booking(self):
         b = booking_services.create_booking(
             user=self.user, court=self.court,
@@ -345,6 +395,34 @@ class CheckoutViewTests(BaseTestCase):
         tx.refresh_from_db()
         self.assertEqual(tx.provider_checkout_id, 'cs_new_1')
         self.assertEqual(tx.provider, Transaction.Provider.PAYMONGO)
+
+    @override_settings(**TEST_KEYS)
+    @patch('transactions.payments.requests.post')
+    def test_checkout_sends_one_line_item_per_slot(self, mock_post):
+        b = booking_services.create_booking(
+            user=self.user, court=self.court,
+            selected_date=date.today() + timedelta(days=1),
+            start_times=[dtime(9, 0), dtime(10, 0)],
+            payment_method='online',
+        )
+        tx = b.transaction
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            'data': {
+                'id': 'cs_multi_items',
+                'attributes': {'checkout_url': 'https://checkout.paymongo.com/multi'},
+            }
+        }
+        self.client.login(email='player@example.com', password='pass12345')
+        resp = self.client.get(reverse('transactions:pay_online', args=[tx.pk]))
+        self.assertEqual(resp.status_code, 302)
+        payload = json.loads(mock_post.call_args.kwargs['data'])
+        line_items = payload['data']['attributes']['line_items']
+        self.assertEqual(len(line_items), 2)
+        self.assertEqual(
+            sum(item['amount'] for item in line_items),
+            int(tx.amount * 100),
+        )
 
     @override_settings(**TEST_KEYS)
     @patch('transactions.payments.requests.post')
