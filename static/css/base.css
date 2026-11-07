@@ -32,6 +32,9 @@
   --slate-text: #55658A;
   --navy-soft:  rgba(27,42,74,.08);
 
+  /* Prices follow the primary text color (navy light / near-white dark) */
+  --price-text: #1B2A4A;
+
   /* Surfaces (light) */
   --bg:          #F8F8F6;
   --bg-card:     #FFFFFF;
@@ -98,6 +101,7 @@
   --bg-hover:    rgba(255,255,255,.06);
   --text:        #e7ecf3;
   --text-muted:  #96A5C0;
+  --price-text:  #e7ecf3;
   --border:      #243450;
   --table-head-bg: #1A2740;
   --shadow:      0 2px 12px rgba(0,0,0,0.35);
@@ -482,6 +486,8 @@ a:hover { color: var(--pt-navy-dark); }
 .text-yellow { color: var(--pt-yellow-dark) !important; }
 .text-ok     { color: var(--ok-text) !important; }
 .text-warn   { color: var(--warn-text) !important; }
+.text-price  { color: var(--price-text) !important; }
+.text-icon   { color: var(--price-text) !important; }
 .text-danger-soft { color: var(--danger-text) !important; }
 .bg-navy     { background: var(--pt-navy) !important; }
 .bg-yellow   { background: var(--pt-yellow) !important; }

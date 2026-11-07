@@ -99,8 +99,7 @@
         </thead>
         <tbody>
             {% for item in items %}
-            <tr {% if item.stock == 0 %}class="table-danger"
-                {% elif item.stock <= 5 %}class="table-warning"{% endif %}>
+            <tr>
                 <td data-label="Item">
                     <div class="d-flex align-items-center gap-2">
                         {% if item.image %}

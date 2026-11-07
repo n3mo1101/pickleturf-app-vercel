@@ -10,37 +10,55 @@
         <h1 class="pt-page-title">{{ session.title }}</h1>
         <p class="pt-page-subtitle">Open play session</p>
     </div>
-    <div class="pt-page-actions d-flex gap-2">
-        <a href="{% url 'openplay:admin_edit' session.pk %}"
-           class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil"></i> Edit
-        </a>
-        {% if session.status not in 'completed,cancelled' %}
-        <form method="post" action="{% url 'openplay:admin_complete' session.pk %}"
-              class="d-inline"
-              data-pt-confirm
-              data-pt-confirm-title="Complete session"
-              data-pt-confirm-body="Mark &quot;{{ session.title|escapejs }}&quot; as completed?"
-              data-pt-confirm-label="Complete"
-              data-pt-confirm-class="btn-primary">
-            {% csrf_token %}
-            <button class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-check2-all"></i> Complete
+    <div class="pt-page-actions">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary btn-icon-outline"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="Session actions">
+                <i class="bi bi-three-dots-vertical"></i>
             </button>
-        </form>
-        <form method="post" action="{% url 'openplay:admin_cancel' session.pk %}"
-              class="d-inline"
-              data-pt-confirm
-              data-pt-confirm-title="Cancel session"
-              data-pt-confirm-body="Cancel &quot;{{ session.title|escapejs }}&quot;? This can't be undone."
-              data-pt-confirm-label="Cancel session"
-              data-pt-confirm-class="btn-danger">
-            {% csrf_token %}
-            <button class="btn btn-sm btn-outline-danger">
-                <i class="bi bi-x-circle"></i> Cancel
-            </button>
-        </form>
-        {% endif %}
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item"
+                       href="{% url 'openplay:admin_edit' session.pk %}">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                </li>
+                {% if session.status not in 'completed,cancelled' %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form method="post"
+                          action="{% url 'openplay:admin_complete' session.pk %}"
+                          data-pt-confirm
+                          data-pt-confirm-title="Complete session"
+                          data-pt-confirm-body="Mark &quot;{{ session.title|escapejs }}&quot; as completed?"
+                          data-pt-confirm-label="Complete"
+                          data-pt-confirm-class="btn-primary">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item">
+                            <i class="bi bi-check2-all"></i> Complete
+                        </button>
+                    </form>
+                </li>
+                <li>
+                    <form method="post"
+                          action="{% url 'openplay:admin_cancel' session.pk %}"
+                          data-pt-confirm
+                          data-pt-confirm-title="Cancel session"
+                          data-pt-confirm-body="Cancel &quot;{{ session.title|escapejs }}&quot;? This can't be undone."
+                          data-pt-confirm-label="Cancel session"
+                          data-pt-confirm-class="btn-danger">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </button>
+                    </form>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
     </div>
 </header>
 

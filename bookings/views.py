@@ -42,10 +42,16 @@ def booking_create_view(request):
 
     court_id      = request.GET.get('court') or request.POST.get('court')
     selected_date = request.GET.get('date')  or request.POST.get('date')
+    requested_slots = (
+        request.POST.getlist('time_slots')
+        if request.method == 'POST'
+        else request.GET.getlist('time')
+    )
 
     court           = None
     available_slots = None
     parsed_date     = None
+    preselected_slots = []
     brackets        = services.get_price_brackets_display()
     is_admin = getattr(request.user, 'is_admin_or_staff', False)
 
@@ -56,6 +62,10 @@ def booking_create_view(request):
             available_slots = services.get_available_slots_for_court(
                 court, parsed_date
             )
+            valid_slot_values = {value for value, _ in available_slots}
+            preselected_slots = [
+                value for value in requested_slots if value in valid_slot_values
+            ]
         except (Court.DoesNotExist, ValueError):
             court = None
 
@@ -135,7 +145,12 @@ def booking_create_view(request):
                 return redirect('bookings:my_bookings')
 
     else:
-        initial = {'court': court_id, 'date': selected_date, 'payment_method': 'onsite'}
+        initial = {
+            'court': court_id,
+            'date': selected_date,
+            'payment_method': 'onsite',
+            'time_slots': preselected_slots,
+        }
         effective_payments = False if is_admin else payments_enabled()
         form    = BookingForm(
             initial=initial, available_slots=available_slots, payments_enabled=effective_payments
@@ -147,6 +162,7 @@ def booking_create_view(request):
         'court':          court,
         'selected_date':  parsed_date,
         'slots_available': available_slots,
+        'preselected_slots': preselected_slots,
         'brackets':       brackets,
         'payments_enabled': False if is_admin else payments_enabled(),
         'is_admin': is_admin,

@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const isSale      = !!document.getElementById('pos-form');
     const formId      = isSale ? 'pos-form' : 'rental-form';
     const cardClass   = isSale ? '.pos-item-card' : '.rental-item-card';
-    const priceColor  = isSale ? 'text-success' : 'text-warning';
+    const priceColor  = 'text-price';
     const borderClass = isSale ? 'border-success' : 'border-warning';
 
     const qtyInputs   = document.querySelectorAll('.qty-input');

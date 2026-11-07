@@ -48,7 +48,7 @@
             <tr {% if slot_data.past %}class="slot-row-past"{% endif %}>
                 <td class="fw-semibold text-nowrap">
                     {{ slot_label }}
-                    <div class="text-ok small fw-semibold">
+                    <div class="text-price small fw-semibold">
                         ₱{{ slot_data.price }}/hr
                     </div>
                 </td>
@@ -63,7 +63,7 @@
                             Reserved
                         </span>
                     {% else %}
-                        <a href="{% url 'bookings:create' %}?court={{ court.id }}&date={{ selected_date|date:'Y-m-d' }}&time={{ slot_label|slice:':8' }}"
+                        <a href="{% url 'bookings:create' %}?court={{ court.id }}&date={{ selected_date|date:'Y-m-d' }}&time={{ slot_data.time }}"
                            class="slot-pill slot-pill--available">
                             Available
                         </a>

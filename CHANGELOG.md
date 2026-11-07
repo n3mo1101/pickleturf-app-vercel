@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-08 — Interface refinements
+
+### Changed
+- Open play manage page actions (`Edit`, `Complete`, `Cancel`) are now in a 3-dots dropdown
+- Inventory rows use the default background and hover instead of yellow/red stock tints; stock counts remain color-coded
+- Shop grid displays two items per row on phones, three on tablets, and four on desktop
+- Clicking an `Available` slot on the availability grid opens the booking form with that slot pre-checked and the price summary updated
+- Shop cards use compact image and text sizing below `576px`
+- Prices across shop, POS, availability, booking form, dashboard, and transactions use the theme text color (navy in light mode, near-white in dark mode)
+- Booking form and open play detail icons use the same adaptive text color instead of mixed status colors
+
 ## 2026-11-05 — Dashboard KPI and chart refresh
 
 ### Added

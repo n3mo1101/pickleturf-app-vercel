@@ -47,19 +47,18 @@
 </form>
 
 {% if items %}
-<div class="row g-3">
+<div class="row g-2 g-sm-3">
     {% for item in items %}
-    <div class="col-md-4 col-lg-3">
-        <div class="card h-100 shadow-sm border-0">
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="card shop-card h-100 shadow-sm border-0">
 
             {# Item Image #}
             {% if item.image %}
-            <img src="{{ item.image.url }}" class="card-img-top"
-                 style="height:180px;object-fit:cover;" alt="{{ item.name }}">
+            <img src="{{ item.image.url }}" class="card-img-top shop-card-img"
+                 alt="{{ item.name }}">
             {% else %}
-            <div class="bg-light d-flex align-items-center justify-content-center"
-                 style="height:180px;">
-                <i class="bi bi-box-seam text-muted" style="font-size:3rem;"></i>
+            <div class="shop-card-img shop-card-placeholder bg-light d-flex align-items-center justify-content-center">
+                <i class="bi bi-box-seam text-muted"></i>
             </div>
             {% endif %}
 
@@ -89,12 +88,12 @@
                 {# Pricing #}
                 <div class="mt-auto">
                     {% if item.sale_price %}
-                    <div class="fw-semibold text-primary">
+                    <div class="fw-semibold text-price">
                         <i class="bi bi-cart3"></i> ₱{{ item.sale_price }}
                     </div>
                     {% endif %}
                     {% if item.rent_price %}
-                    <div class="fw-semibold text-warning">
+                    <div class="fw-semibold text-price">
                         <i class="bi bi-clock"></i> ₱{{ item.rent_price }}/hr
                     </div>
                     {% endif %}

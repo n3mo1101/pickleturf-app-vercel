@@ -585,13 +585,26 @@ label.form-label {
   transition: border-color .15s, background .15s, box-shadow .15s;
 }
 .slot-card:hover {
-  border-color: var(--pt-navy) !important;
+  border-color: var(--text) !important;
   background: var(--bg-hover);
 }
 .slot-card.is-selected {
-  border-color: var(--pt-navy) !important;
-  background: var(--navy-soft);
-  box-shadow: 0 0 0 1px var(--pt-navy);
+  border-color: var(--ok-text) !important;
+  background: var(--ok-soft) !important;
+  box-shadow: none;
+}
+
+/* Payment option cards use the same green selected treatment */
+.payment-option {
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.payment-option:hover {
+  border-color: var(--text) !important;
+}
+.payment-option.is-selected {
+  border-color: var(--ok-text) !important;
+  background: var(--ok-soft) !important;
+  box-shadow: none;
 }
 
 

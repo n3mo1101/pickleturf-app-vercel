@@ -21,7 +21,7 @@
                             <i class="bi bi-clock text-warning"></i>
                             <div>
                                 <div class="small fw-semibold">{{ bracket.label }}</div>
-                                <div class="text-success fw-bold small">
+                                <div class="text-price fw-bold small">
                                     ₱{{ bracket.rate }}/hr
                                 </div>
                             </div>
@@ -46,7 +46,7 @@
                             {{ form.date }}
                         </div>
                         <div class="col-md-3">
-                            <button type="submit" class="btn btn-outline-success w-100">
+                            <button type="submit" class="btn btn-primary w-100">
                                 <i class="bi bi-search"></i> Show Slots
                             </button>
                         </div>
@@ -81,10 +81,11 @@
                                         value="{{ value }}"
                                         id="slot_{{ forloop.counter }}"
                                         data-price="{{ value|get_slot_price }}"
+                                        {% if value in preselected_slots %}checked{% endif %}
                                     >
                                     <label class="form-check-label fw-semibold w-100"
                                         for="slot_{{ forloop.counter }}">
-                                        <i class="bi bi-clock me-1 text-success"></i>
+                                        <i class="bi bi-clock me-1 text-icon"></i>
                                         {{ label }}
                                     </label>
                                 </div>
@@ -100,7 +101,7 @@
                                     <span class="text-muted">Duration:</span>
                                     <strong id="total-hours">0</strong> hour(s)
                                 </div>
-                                <div class="fs-5 fw-bold text-success">
+                                <div class="fs-5 fw-bold text-price">
                                     Total: ₱<span id="total-price-amount">0</span>
                                 </div>
                             </div>
@@ -123,7 +124,7 @@
                                 <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
                                     <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
                                     <div class="flex-grow-1">
-                                        <div class="fw-semibold"><i class="bi bi-shop text-success"></i>On-site</div>
+                                        <div class="fw-semibold"><i class="bi bi-shop text-icon"></i> On-site</div>
                                         <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
                                     </div>
                                     <span class="badge bg-success">Cash</span>
@@ -134,7 +135,7 @@
                                 <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
                                     <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
                                     <div class="flex-grow-1">
-                                        <div class="fw-semibold"><i class="bi bi-shop text-success"></i> Pay on-site</div>
+                                        <div class="fw-semibold"><i class="bi bi-shop text-icon"></i> Pay on-site</div>
                                         <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
                                     </div>
                                     <span class="badge bg-success">On-site</span>
@@ -142,7 +143,7 @@
                                 <label class="card border p-3 d-flex flex-row align-items-center gap-3 payment-option mb-0" style="cursor:pointer;">
                                     <input type="radio" name="payment_method" value="online" class="form-check-input m-0 payment-radio">
                                     <div class="flex-grow-1">
-                                        <div class="fw-semibold"><i class="bi bi-phone text-primary"></i> Pay online <small class="text-muted">(GCash / Card)</small></div>
+                                        <div class="fw-semibold"><i class="bi bi-phone text-icon"></i> Pay online <small class="text-muted">(GCash / Card)</small></div>
                                         <small class="text-muted">Reserve now, pay via PayMongo. Confirmed after payment.</small>
                                     </div>
                                     <span class="badge bg-primary">Pay Now</span>
@@ -213,9 +214,7 @@
     function updatePaymentHighlight() {
         paymentOptions.forEach(opt => {
             const radio = opt.querySelector('.payment-radio');
-            opt.classList.toggle('border-success', radio && radio.checked);
-            opt.classList.toggle('bg-success', radio && radio.checked);
-            opt.classList.toggle('bg-opacity-10', radio && radio.checked);
+            opt.classList.toggle('is-selected', radio && radio.checked);
         });
     }
 
@@ -241,14 +240,24 @@
     }
 
     // Highlight card when checkbox is checked
+    function syncSlotCard(cb) {
+        const card = cb.closest('.slot-card');
+        if (!card) return;
+        card.classList.toggle('is-selected', cb.checked);
+    }
+
     checkboxes.forEach(cb => {
+        syncSlotCard(cb);
         cb.addEventListener('change', () => {
-            cb.closest('.slot-card').classList.toggle('border-success', cb.checked);
-            cb.closest('.slot-card').classList.toggle('bg-success',     cb.checked);
-            cb.closest('.slot-card').classList.toggle('bg-opacity-10',  cb.checked);
+            syncSlotCard(cb);
             updateSummary();
         });
     });
+
+    // Slots carried over from the availability grid are pre-checked
+    if (checkboxes.length) {
+        updateSummary();
+    }
 
     paymentRadios.forEach(r => {
         r.addEventListener('change', () => {

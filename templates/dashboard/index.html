@@ -164,7 +164,7 @@
                                     {{ tx.description|tx_desc|truncatechars:45 }}
                                 </td>
                                 <td data-label="Amount"
-                                    class="fw-semibold text-ok small">
+                                    class="fw-semibold text-price small">
                                     ₱{{ tx.amount|floatformat:2 }}
                                 </td>
                                 <td data-label="Status">
@@ -221,7 +221,7 @@
                             <div class="text-muted text-truncate booking-user">
                                 {{ b.user.full_name }}
                             </div>
-                            <div class="text-ok fw-semibold text-nowrap booking-price">
+                            <div class="text-price fw-semibold text-nowrap booking-price">
                                 ₱{{ b.price|floatformat:2 }}
                             </div>
                         </div>

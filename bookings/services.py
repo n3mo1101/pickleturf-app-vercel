@@ -51,6 +51,7 @@ def get_availability(selected_date):
             'courts': {},
             'price':  slot_price,
             'past':   slot_past,
+            'time':   slot_time.strftime('%H:%M:%S'),
         }
         for court in courts:
             if slot_past:
