@@ -84,18 +84,18 @@ class BookingServiceTests(TestCase):
 
     # ── Booking Creation ──────────────────────────────────────
 
-    def test_booking_created_with_confirmed_status_onsite(self):
-        """Default (onsite) bookings are CONFIRMED."""
+    def test_booking_created_with_reserved_status_onsite(self):
+        """Every successful creation is RESERVED, regardless of payment."""
         booking = create_booking(
             user=self.user,
             court=self.court,
             selected_date=self.tomorrow,
             start_time=self.slot_9am,
         )
-        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
+        self.assertEqual(booking.status, Booking.Status.RESERVED)
 
-    def test_booking_created_with_pending_status_online(self):
-        """Online bookings are PENDING until payment."""
+    def test_booking_created_with_reserved_status_online(self):
+        """Online reservations are also RESERVED while payment is pending."""
         from django.test import override_settings
         with override_settings(PAYMONGO_SECRET_KEY='sk_test_123', PAYMENTS_ENABLED=True, SITE_URL='https://example.com'):
             booking = create_booking(
@@ -105,10 +105,28 @@ class BookingServiceTests(TestCase):
                 start_time=self.slot_9am,
                 payment_method='online',
             )
-            self.assertEqual(booking.status, Booking.Status.PENDING)
+            self.assertEqual(booking.status, Booking.Status.RESERVED)
             from transactions.models import Transaction
             tx = booking.transaction
             self.assertEqual(tx.provider, Transaction.Provider.PAYMONGO)
+            self.assertEqual(
+                tx.payment_status, Transaction.PaymentStatus.PENDING
+            )
+
+    def test_mark_paid_creates_paid_transaction(self):
+        """Staff walk-in bookings can be settled on the spot."""
+        from transactions.models import Transaction
+        booking = create_booking(
+            user=self.user,
+            court=self.court,
+            selected_date=self.tomorrow,
+            start_time=self.slot_9am,
+            mark_paid=True,
+        )
+        tx = Transaction.objects.get(booking=booking)
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertIsNotNone(tx.paid_at)
+        self.assertEqual(booking.status, Booking.Status.RESERVED)
 
     def test_booking_end_time_auto_set(self):
         booking = create_booking(
@@ -287,15 +305,13 @@ class BookingServiceTests(TestCase):
 
     # ── Cancellation ──────────────────────────────────────────
 
-    def test_cancel_future_confirmed_booking(self):
+    def test_cancel_future_reserved_booking(self):
         booking = create_booking(
             user=self.user,
             court=self.court,
             selected_date=self.tomorrow,
             start_time=self.slot_9am,
         )
-        booking.status = Booking.Status.CONFIRMED
-        booking.save()
         cancelled = cancel_booking(booking)
         self.assertEqual(cancelled.status, Booking.Status.CANCELLED)
 
@@ -306,7 +322,7 @@ class BookingServiceTests(TestCase):
             date=self.today - timedelta(days=1),
             start_time=self.slot_9am,
             end_time=self.slot_10am,
-            status=Booking.Status.CONFIRMED,
+            status=Booking.Status.RESERVED,
         )
         with self.assertRaises(ValidationError):
             cancel_booking(booking)
@@ -318,8 +334,6 @@ class BookingServiceTests(TestCase):
             selected_date=self.tomorrow,
             start_time=self.slot_9am,
         )
-        booking.status = Booking.Status.CONFIRMED
-        booking.save()
         cancel_booking(booking)
         self.assertTrue(
             is_slot_available(self.court, self.tomorrow, self.slot_9am)
@@ -327,22 +341,7 @@ class BookingServiceTests(TestCase):
 
     # ── Auto Status Update ────────────────────────────────────
 
-    def test_past_confirmed_booking_becomes_completed(self):
-        from django.utils import timezone
-        yesterday = self.today - timedelta(days=1)
-        booking = Booking.objects.create(
-            user=self.user,
-            court=self.court,
-            date=yesterday,
-            start_time=time(8, 0),
-            end_time=time(9, 0),
-            status=Booking.Status.CONFIRMED,
-        )
-        auto_update_booking_statuses()
-        booking.refresh_from_db()
-        self.assertEqual(booking.status, Booking.Status.COMPLETED)
-
-    def test_past_pending_booking_becomes_cancelled(self):
+    def test_past_paid_booking_becomes_completed(self):
         from transactions.models import Transaction
         yesterday = self.today - timedelta(days=1)
         booking = Booking.objects.create(
@@ -351,7 +350,29 @@ class BookingServiceTests(TestCase):
             date=yesterday,
             start_time=time(8, 0),
             end_time=time(9, 0),
-            status=Booking.Status.PENDING,
+            status=Booking.Status.RESERVED,
+        )
+        Transaction.objects.create(
+            user=self.user,
+            tx_type=Transaction.TxType.BOOKING,
+            amount=300,
+            booking=booking,
+            payment_status=Transaction.PaymentStatus.PAID,
+        )
+        auto_update_booking_statuses()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, Booking.Status.COMPLETED)
+
+    def test_past_unpaid_booking_becomes_missed(self):
+        from transactions.models import Transaction
+        yesterday = self.today - timedelta(days=1)
+        booking = Booking.objects.create(
+            user=self.user,
+            court=self.court,
+            date=yesterday,
+            start_time=time(8, 0),
+            end_time=time(9, 0),
+            status=Booking.Status.RESERVED,
         )
         tx = Transaction.objects.create(
             user=self.user,
@@ -362,11 +383,36 @@ class BookingServiceTests(TestCase):
         auto_update_booking_statuses()
         booking.refresh_from_db()
         tx.refresh_from_db()
-        self.assertEqual(booking.status, Booking.Status.CANCELLED)
+        self.assertEqual(booking.status, Booking.Status.MISSED)
         self.assertEqual(tx.payment_status, Transaction.PaymentStatus.WAIVED)
 
-    def test_cancel_future_pending_booking(self):
-        """PENDING future bookings should now be cancellable (regression fix)."""
+    def test_past_refunded_booking_keeps_refunded_transaction(self):
+        from transactions.models import Transaction
+        yesterday = self.today - timedelta(days=1)
+        booking = Booking.objects.create(
+            user=self.user,
+            court=self.court,
+            date=yesterday,
+            start_time=time(8, 0),
+            end_time=time(9, 0),
+            status=Booking.Status.RESERVED,
+        )
+        tx = Transaction.objects.create(
+            user=self.user,
+            tx_type=Transaction.TxType.BOOKING,
+            amount=300,
+            booking=booking,
+            payment_status=Transaction.PaymentStatus.REFUNDED,
+        )
+        auto_update_booking_statuses()
+        booking.refresh_from_db()
+        tx.refresh_from_db()
+        self.assertEqual(booking.status, Booking.Status.MISSED)
+        self.assertEqual(
+            tx.payment_status, Transaction.PaymentStatus.REFUNDED
+        )
+
+    def test_future_reserved_booking_is_cancellable(self):
         booking = create_booking(
             user=self.user,
             court=self.court,
@@ -374,9 +420,6 @@ class BookingServiceTests(TestCase):
             start_time=self.slot_9am,
             payment_method='onsite',
         )
-        # Force to PENDING to simulate online reservation
-        booking.status = Booking.Status.PENDING
-        booking.save(update_fields=['status'])
         self.assertTrue(booking.is_cancellable)
         cancelled = cancel_booking(booking)
         self.assertEqual(cancelled.status, Booking.Status.CANCELLED)
@@ -449,7 +492,7 @@ class BookingStatusViewTests(TestCase):
             date=date.today() + timedelta(days=1),
             start_time=time(9, 0),
             end_time=time(10, 0),
-            status=Booking.Status.CONFIRMED,
+            status=Booking.Status.RESERVED,
         )
         self.client.force_login(self.staff)
 
@@ -502,4 +545,46 @@ class BookingStatusViewTests(TestCase):
         self.assertEqual(booking.status, Booking.Status.CANCELLED)
         self.assertFalse(
             booking.slots.filter(is_active=True).exists()
+        )
+
+    def test_completing_booking_does_not_mark_transaction_paid(self):
+        from transactions.models import Transaction
+        tx = Transaction.objects.create(
+            user=self.customer,
+            tx_type=Transaction.TxType.BOOKING,
+            amount=self.booking.price,
+            booking=self.booking,
+        )
+        self.client.post(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {'status': Booking.Status.COMPLETED},
+        )
+        self.booking.refresh_from_db()
+        tx.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.Status.COMPLETED)
+        self.assertEqual(
+            tx.payment_status, Transaction.PaymentStatus.PENDING
+        )
+
+    def test_missed_cannot_be_set_manually(self):
+        response = self.client.post(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {'status': Booking.Status.MISSED},
+            follow=True,
+        )
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.Status.RESERVED)
+        self.assertContains(response, 'Missed is set automatically')
+
+    def test_status_modal_offers_only_editable_statuses(self):
+        response = self.client.get(
+            reverse('bookings:admin_status', args=[self.booking.pk]),
+            {'modal': '1'},
+        )
+        for status in (Booking.Status.RESERVED,
+                       Booking.Status.COMPLETED,
+                       Booking.Status.CANCELLED):
+            self.assertContains(response, f'value="{status}"')
+        self.assertNotContains(
+            response, f'value="{Booking.Status.MISSED}"'
         )

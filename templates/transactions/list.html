@@ -56,8 +56,8 @@
 <div class="row g-3 mb-4">
     <div class="col-6">
         <div class="card stat-tile text-center">
-            <div class="stat-tile-value text-price">₱{{ total_amount|floatformat:2 }}</div>
-            <div class="stat-tile-label mt-1">Total{% if type_filter or status_filter or date_from or date_to %} (filtered){% endif %}</div>
+            <div class="stat-tile-value text-price">₱{{ paid_total|floatformat:2 }}</div>
+            <div class="stat-tile-label mt-1">Total Revenue{% if type_filter or status_filter or date_from or date_to %} (filtered){% endif %}</div>
         </div>
     </div>
     <div class="col-6">

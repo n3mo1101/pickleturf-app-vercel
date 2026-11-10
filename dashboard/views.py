@@ -27,12 +27,9 @@ _TX_TYPE_SHORT = {
 
 
 def _revenue_queryset():
-    """Base queryset — only paid or pending (on-site) transactions count."""
+    """Revenue counts only transactions that were actually paid."""
     return Transaction.objects.filter(
-        payment_status__in=[
-            Transaction.PaymentStatus.PENDING,
-            Transaction.PaymentStatus.PAID,
-        ]
+        payment_status=Transaction.PaymentStatus.PAID
     )
 
 
@@ -119,9 +116,12 @@ def _format_duration(delta):
 
 @admin_or_staff_required
 def index(request):
-    # Update booking statuses before loading dashboard data
+    # Update booking and open play statuses before loading dashboard data
     from bookings.services import auto_update_booking_statuses
+    from openplay.services import auto_update_session_statuses
+
     auto_update_booking_statuses()
+    auto_update_session_statuses()
 
     today = date.today()
     now   = timezone.now()
@@ -185,18 +185,18 @@ def index(request):
     booking_counts = Booking.objects.filter(
         date=today,
         status__in=[
-            Booking.Status.PENDING,
-            Booking.Status.CONFIRMED,
+            Booking.Status.RESERVED,
             Booking.Status.COMPLETED,
+            Booking.Status.MISSED,
         ],
     ).aggregate(
         total=Count('id'),
         completed=Count('id', filter=Q(status=Booking.Status.COMPLETED)),
-        pending=Count('id', filter=Q(status=Booking.Status.PENDING)),
+        reserved=Count('id', filter=Q(status=Booking.Status.RESERVED)),
     )
     bookings_today = booking_counts['total']
     bookings_completed_today = booking_counts['completed']
-    bookings_pending_today = booking_counts['pending']
+    bookings_reserved_today = booking_counts['reserved']
 
     active_rental_qs = RentalRecord.objects.filter(
         status=RentalRecord.Status.ACTIVE
@@ -231,9 +231,9 @@ def index(request):
         .filter(
             date=today,
             status__in=[
-                Booking.Status.PENDING,
-                Booking.Status.CONFIRMED,
+                Booking.Status.RESERVED,
                 Booking.Status.COMPLETED,
+                Booking.Status.MISSED,
             ],
             end_time__gt=now_time,
         )
@@ -267,7 +267,7 @@ def index(request):
         'prev_month_label': prev_month_end.strftime('%b'),
         'bookings_today':   bookings_today,
         'bookings_completed_today': bookings_completed_today,
-        'bookings_pending_today':   bookings_pending_today,
+        'bookings_reserved_today':  bookings_reserved_today,
         'active_rentals':   active_rentals,
         'longest_rental_display': longest_rental_display,
 

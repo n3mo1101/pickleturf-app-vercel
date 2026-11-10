@@ -35,10 +35,17 @@ class Booking(models.Model):
     """A reservation header covering one or more hourly court slots."""
 
     class Status(models.TextChoices):
-        PENDING   = 'pending',   'Pending'
-        CONFIRMED = 'confirmed', 'Confirmed'
-        CANCELLED = 'cancelled', 'Cancelled'
+        RESERVED  = 'reserved',  'Reserved'
         COMPLETED = 'completed', 'Completed'
+        MISSED    = 'missed',    'Missed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    #: Statuses an admin may set manually. MISSED is system-assigned only.
+    EDITABLE_STATUSES = (
+        (Status.RESERVED, Status.RESERVED.label),
+        (Status.COMPLETED, Status.COMPLETED.label),
+        (Status.CANCELLED, Status.CANCELLED.label),
+    )
 
     # ── Relationships ──────────────────────────────────────────────
     user  = models.ForeignKey(
@@ -61,7 +68,7 @@ class Booking(models.Model):
 
     # ── Booking meta ───────────────────────────────────────────────
     status     = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING
+        max_length=20, choices=Status.choices, default=Status.RESERVED
     )
     price      = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     notes      = models.TextField(blank=True)
@@ -174,11 +181,11 @@ class Booking(models.Model):
 
     @property
     def is_cancellable(self):
-        """Allow cancellation if pending or confirmed and still in the future."""
+        """Allow cancellation while the slot is still reserved and upcoming."""
         booking_dt = datetime.combine(self.date, self.start_time)
         booking_dt = timezone.make_aware(booking_dt)
         return (
-            self.status in (self.Status.PENDING, self.Status.CONFIRMED)
+            self.status == self.Status.RESERVED
             and booking_dt > timezone.now()
         )
 

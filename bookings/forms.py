@@ -31,10 +31,6 @@ class BookingForm(forms.Form):
         choices=[],       # populated dynamically
         label='Available Time Slots',
     )
-    notes = forms.CharField(
-        required=False,
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-    )
     payment_method = forms.ChoiceField(
         choices=[('onsite', 'Pay on-site'), ('online', 'Pay online — GCash/Card')],
         initial='onsite',

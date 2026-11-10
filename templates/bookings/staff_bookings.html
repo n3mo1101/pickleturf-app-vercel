@@ -19,77 +19,160 @@
     </div>
 </header>
 
-{% if bookings %}
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 table-card-mobile">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Customer</th>
-                    <th>Court</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th class="th-actions"><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for b in bookings %}
-                <tr>
-                    <td data-label="#" class="text-muted small">{{ b.id }}</td>
-                    <td data-label="Customer">
-                        <div class="fw-semibold small">
-                            {{ b.user.full_name }}
-                        </div>
-                        <div class="text-muted" style="font-size:.75rem;">
-                            {{ b.user.email }}
-                        </div>
-                    </td>
-                    <td data-label="Court">{{ b.court.name }}</td>
-                    <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
-                    <td data-label="Time" class="text-nowrap">
-                        {% include 'bookings/_booking_time.html' with b=b %}
-                    </td>
-                    <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
-                    <td data-label="Status">
-                        {% if b.status == 'confirmed' %}
-                        <span class="badge bg-success">Confirmed</span>
-                        {% elif b.status == 'pending' %}
-                        <span class="badge bg-warning">Pending</span>
-                        {% elif b.status == 'cancelled' %}
-                        <span class="badge bg-danger">Cancelled</span>
-                        {% else %}
-                        <span class="badge bg-secondary">
-                            {{ b.get_status_display }}
-                        </span>
+{# ── Filters ── #}
+<form method="get" class="pt-filters">
+    <input type="search" name="q" class="form-control"
+           placeholder="Search customer name or email"
+           value="{{ q }}">
+    <select name="status" class="form-select">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="court" class="form-select">
+        <option value="">All courts</option>
+        {% for court in courts %}
+        <option value="{{ court.id }}" {% if court_filter == court.id|stringformat:"s" %}selected{% endif %}>
+            {{ court.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <input type="date" name="date" class="form-control" value="{{ date_filter }}">
+    <button class="btn btn-primary" type="submit">
+        <i class="bi bi-funnel"></i> Filter
+    </button>
+    <a href="{% url 'bookings:staff_bookings' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-eraser"></i> Clear
+    </a>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle table-card-mobile">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Staff</th>
+                <th>Court</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in bookings %}
+            <tr>
+                <td data-label="#" class="text-muted">{{ b.id }}</td>
+                <td data-label="Customer">
+                    <span class="fw-semibold">{{ b.user.full_name }}</span><br>
+                    <small class="text-muted">{{ b.user.email }}</small>
+                </td>
+                <td data-label="Court">{{ b.court.name }}</td>
+                <td data-label="Date">{{ b.date|date:"M d, Y" }}</td>
+                <td data-label="Time" class="text-nowrap">
+                    {% include 'bookings/_booking_time.html' with b=b %}
+                </td>
+                <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
+                <td data-label="Status">
+                    {% if b.status == 'reserved' %}<span class="badge bg-success">Reserved</span>
+                    {% elif b.status == 'cancelled' %}<span class="badge bg-danger">Cancelled</span>
+                    {% elif b.status == 'completed' %}<span class="badge bg-secondary">Completed</span>
+                    {% elif b.status == 'missed' %}<span class="badge bg-secondary">Missed</span>
+                    {% else %}<span class="badge bg-warning">{{ b.get_status_display }}</span>
+                    {% endif %}
+                    {% if b.transaction %}
+                        {% if b.transaction.payment_status == 'paid' %}<span class="badge bg-success ms-1">Paid</span>
+                        {% elif b.transaction.payment_status == 'pending' %}<span class="badge bg-warning ms-1">Unpaid</span>
+                        {% elif b.transaction.payment_status == 'waived' %}<span class="badge bg-secondary ms-1">Waived</span>
+                        {% elif b.transaction.payment_status == 'refunded' %}<span class="badge bg-danger ms-1">Refunded</span>
                         {% endif %}
-                    </td>
-                    <td class="td-actions">
-                        <div class="dropdown">
-                            <button class="btn btn-icon" type="button"
-                                    data-bs-toggle="dropdown"
-                                    aria-expanded="false"
-                                    aria-label="Actions for booking #{{ b.id }}">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
+                    {% endif %}
+                </td>
+                <td class="td-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-icon" type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Actions for booking #{{ b.id }}">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'bookings:admin_status' b.pk %}?next={{ request.get_full_path|urlencode }}"
+                                   data-pt-form-modal>
+                                    <i class="bi bi-pencil"></i> Update status
+                                </a>
+                            </li>
+                            {% if b.transaction %}
+                                {% if b.transaction.payment_status == 'pending' %}
                                 <li>
-                                    <a class="dropdown-item"
-                                       href="{% url 'bookings:admin_status' b.pk %}?next={{ request.get_full_path|urlencode }}"
-                                       data-pt-form-modal>
-                                        <i class="bi bi-pencil"></i> Update status
-                                    </a>
+                                    <form method="post"
+                                          action="{% url 'transactions:mark_paid' b.transaction.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Mark as paid"
+                                          data-pt-confirm-body="Record ₱{{ b.transaction.amount|floatformat:2 }} as paid for booking #{{ b.id }} ({{ b.user.full_name }})? This cannot be undone."
+                                          data-pt-confirm-label="Mark paid"
+                                          data-pt-confirm-class="btn-primary">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="bi bi-check-circle"></i> Mark paid
+                                        </button>
+                                    </form>
                                 </li>
-                            </ul>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                                {% elif b.transaction.payment_status == 'waived' and b.status == 'missed' %}
+                                <li>
+                                    <form method="post"
+                                          action="{% url 'transactions:mark_paid' b.transaction.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Mark as paid"
+                                          data-pt-confirm-body="Record ₱{{ b.transaction.amount|floatformat:2 }} as paid for missed booking #{{ b.id }} ({{ b.user.full_name }})? This cannot be undone."
+                                          data-pt-confirm-label="Mark paid"
+                                          data-pt-confirm-class="btn-primary">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="bi bi-check-circle"></i> Mark paid
+                                        </button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                            {% endif %}
+                            {% if b.is_cancellable %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'bookings:admin_cancel' b.pk %}"
+                                      data-pt-confirm
+                                      data-pt-confirm-title="Cancel booking"
+                                      data-pt-confirm-body="Booking #{{ b.id }} for {{ b.court.name }} on {{ b.date|date:"M d" }} ({{ b.time_summary }}) will be released."
+                                      data-pt-confirm-label="Cancel booking"
+                                      data-pt-confirm-class="btn-danger">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-x-circle"></i> Cancel booking
+                                    </button>
+                                </form>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="bi bi-calendar-x"></i>
+                    No bookings found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 {# ── Pagination ── #}
@@ -99,7 +182,7 @@
         {% if bookings.has_previous %}
         <li class="page-item">
             <a class="page-link"
-               href="?page={{ bookings.previous_page_number }}">
+               href="?page={{ bookings.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
                 &laquo; Prev
             </a>
         </li>
@@ -115,14 +198,15 @@
             </li>
             {% elif num > bookings.number|add:'-3' and num < bookings.number|add:'3' %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                <a class="page-link"
+                   href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">{{ num }}</a>
             </li>
             {% endif %}
         {% endfor %}
         {% if bookings.has_next %}
         <li class="page-item">
             <a class="page-link"
-               href="?page={{ bookings.next_page_number }}">
+               href="?page={{ bookings.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
                 Next &raquo;
             </a>
         </li>
@@ -137,18 +221,4 @@
     </p>
 </nav>
 {% endif %}
-
-{% else %}
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.5;"></i>
-        <p class="mt-3 mb-3">No bookings created yet.</p>
-        <a href="{% url 'bookings:admin_create' %}"
-           class="btn btn-primary">
-            Create a booking
-        </a>
-    </div>
-</div>
-{% endif %}
-
 {% endblock %}

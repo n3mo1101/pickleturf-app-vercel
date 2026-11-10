@@ -38,7 +38,7 @@ def get_availability(selected_date):
     booked_slots = BookingSlot.objects.filter(
         date=selected_date,
         is_active=True,
-        booking__status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED],
+        booking__status=Booking.Status.RESERVED,
     ).values('court_id', 'start_time')
 
     booked_set = {(s['court_id'], s['start_time']) for s in booked_slots}
@@ -72,7 +72,7 @@ def is_slot_available(court, selected_date, start_time):
         date=selected_date,
         start_time=start_time,
         is_active=True,
-        booking__status__in=[Booking.Status.PENDING, Booking.Status.CONFIRMED],
+        booking__status=Booking.Status.RESERVED,
     ).exists()
 
 
@@ -108,12 +108,15 @@ def create_booking(
     notes='',
     payment_method='onsite',
     start_time=None,
+    mark_paid=False,
 ):
     """
     Create a reservation covering one or more time slots atomically.
 
-    payment_method: 'onsite' (default) → CONFIRMED, 'online' → PENDING
-    until PayMongo webhook. Raises ValidationError on any conflict.
+    Every reservation starts as RESERVED — the slot is held immediately.
+    payment_method only decides the transaction provider ('onsite' or
+    'paymongo'); mark_paid settles it on the spot (counter payment).
+    Raises ValidationError on any conflict.
     """
     if start_times is None:
         start_times = [start_time] if start_time is not None else []
@@ -151,10 +154,7 @@ def create_booking(
                 start_time=summary_start,
                 end_time=summary_end,
                 price=total_price,
-                status=(
-                    Booking.Status.PENDING if is_online
-                    else Booking.Status.CONFIRMED
-                ),
+                status=Booking.Status.RESERVED,
                 created_by=created_by or user,
                 notes=notes,
             )
@@ -171,6 +171,7 @@ def create_booking(
             _create_booking_transaction(
                 booking,
                 provider='paymongo' if is_online else 'onsite',
+                paid=mark_paid,
             )
     except IntegrityError as exc:
         raise ValidationError(
@@ -181,12 +182,16 @@ def create_booking(
     return booking
 
 
-def _create_booking_transaction(booking, provider='onsite'):
+def _create_booking_transaction(booking, provider='onsite', paid=False):
     """
-    Create the single pending transaction for a reservation.
-    It only counts toward revenue once paid (online or on-site).
+    Create the single transaction for a reservation.
+
+    It only counts toward revenue once paid (online or on-site). When
+    `paid` is true the charge is settled immediately (counter payment).
     """
     from transactions.models import Transaction
+    from django.utils import timezone
+
     provider_value = (
         Transaction.Provider.PAYMONGO if provider == 'paymongo'
         else Transaction.Provider.ONSITE
@@ -196,7 +201,11 @@ def _create_booking_transaction(booking, provider='onsite'):
         tx_type=Transaction.TxType.BOOKING,
         amount=booking.price,
         booking=booking,
-        payment_status=Transaction.PaymentStatus.PENDING,
+        payment_status=(
+            Transaction.PaymentStatus.PAID if paid
+            else Transaction.PaymentStatus.PENDING
+        ),
+        paid_at=timezone.now() if paid else None,
         provider=provider_value,
         description=(
             f'{booking.court} on {booking.date} '
@@ -239,30 +248,27 @@ def cancel_booking(booking, cancelled_by=None):
 # ── Status Changes ─────────────────────────────────────────────────────────────
 
 def _sync_transaction_status(booking, new_status):
-    """Keep the single linked transaction in step with the booking."""
+    """Keep the single linked transaction in step with the booking.
+
+    Only cancellation affects payment: a collected charge becomes
+    refunded, anything else is written off. Completion never marks a
+    booking paid — that is recorded separately (staff / PayMongo).
+    """
     from transactions.models import Transaction
+
+    if new_status != Booking.Status.CANCELLED:
+        return
 
     try:
         tx = booking.transaction
     except Transaction.DoesNotExist:
         return
 
-    if new_status == Booking.Status.COMPLETED:
-        tx.payment_status = Transaction.PaymentStatus.PAID
-    elif new_status == Booking.Status.CANCELLED:
-        tx.payment_status = (
-            Transaction.PaymentStatus.REFUNDED
-            if tx.payment_status == Transaction.PaymentStatus.PAID
-            else Transaction.PaymentStatus.WAIVED
-        )
-    elif new_status in (Booking.Status.PENDING, Booking.Status.CONFIRMED):
-        if tx.payment_status not in (
-            Transaction.PaymentStatus.PAID,
-            Transaction.PaymentStatus.REFUNDED,
-            Transaction.PaymentStatus.WAIVED,
-        ):
-            tx.payment_status = Transaction.PaymentStatus.PENDING
-
+    tx.payment_status = (
+        Transaction.PaymentStatus.REFUNDED
+        if tx.payment_status == Transaction.PaymentStatus.PAID
+        else Transaction.PaymentStatus.WAIVED
+    )
     tx.save(update_fields=['payment_status', 'updated_at'])
 
 
@@ -271,7 +277,11 @@ def set_booking_status(booking, new_status):
     Update a booking's status, keeping slot availability and the linked
     transaction consistent. Used by the admin status view.
     """
-    if new_status not in dict(Booking.Status.choices):
+    if new_status == Booking.Status.MISSED:
+        raise ValidationError(
+            'Missed is set automatically when a slot passes unpaid.'
+        )
+    if new_status not in dict(Booking.EDITABLE_STATUSES):
         raise ValidationError('Invalid status.')
 
     was_cancelled = booking.status == Booking.Status.CANCELLED
@@ -336,10 +346,7 @@ def get_available_slots_for_court(court, selected_date):
             court=court,
             date=selected_date,
             is_active=True,
-            booking__status__in=[
-                Booking.Status.PENDING,
-                Booking.Status.CONFIRMED,
-            ],
+            booking__status=Booking.Status.RESERVED,
         ).values_list('start_time', flat=True)
     )
 
@@ -362,20 +369,25 @@ def get_available_slots_for_court(court, selected_date):
 def auto_update_booking_statuses():
     """
     Keep booking statuses current. Called by the daily Vercel Cron endpoint
-    (`/bookings/cron/update-statuses/`, midnight Singapore time) and the
-    `update_booking_statuses` management command.
+    (`/bookings/cron/update-statuses/`) and the `update_booking_statuses`
+    management command, and opportunistically on page loads.
 
-    Rules:
-      - CONFIRMED + last slot passed → COMPLETED, transaction → PAID
-      - PENDING   + last slot passed → CANCELLED, transaction stays WAIVED
+    Rules (reserved bookings whose last slot has passed):
+      - transaction PAID                  → COMPLETED
+      - transaction not paid (or missing) → MISSED, unpaid charge waived
+
+    Payment is never forced to PAID here — only actual payment does that.
     """
     from transactions.models import Transaction
 
     now = timezone.now()
 
-    stale = Booking.objects.filter(
-        status__in=[Booking.Status.CONFIRMED, Booking.Status.PENDING]
-    ).select_related('court').prefetch_related('slots')
+    stale = (
+        Booking.objects
+        .filter(status=Booking.Status.RESERVED)
+        .select_related('court')
+        .prefetch_related('slots')
+    )
 
     for booking in stale:
         if not booking.end_time:
@@ -387,31 +399,24 @@ def auto_update_booking_statuses():
         if end_dt > now:
             continue   # still in the future
 
-        if booking.status == Booking.Status.CONFIRMED:
+        try:
+            tx = booking.transaction
+        except Transaction.DoesNotExist:
+            tx = None
+
+        if tx and tx.payment_status == Transaction.PaymentStatus.PAID:
             booking.status = Booking.Status.COMPLETED
             booking.save(update_fields=['status', 'updated_at'])
+            continue
 
-            try:
-                tx = booking.transaction
-                tx.payment_status = Transaction.PaymentStatus.PAID
-                tx.save(update_fields=['payment_status', 'updated_at'])
-            except Transaction.DoesNotExist:
-                pass
+        # No payment collected — the slot was missed. Write off the charge
+        # so it never counts as revenue.
+        booking.status = Booking.Status.MISSED
+        booking.save(update_fields=['status', 'updated_at'])
 
-        elif booking.status == Booking.Status.PENDING:
-            booking.status       = Booking.Status.CANCELLED
-            booking.cancelled_at = now
-            booking.save(update_fields=['status', 'cancelled_at', 'updated_at'])
-            booking.slots.update(is_active=False)
-
-            # Unpaid expired booking — waive the charge (no revenue).
-            try:
-                tx = booking.transaction
-                if tx and tx.payment_status != Transaction.PaymentStatus.PAID:
-                    tx.payment_status = Transaction.PaymentStatus.WAIVED
-                    tx.save(update_fields=['payment_status', 'updated_at'])
-            except Transaction.DoesNotExist:
-                pass
+        if tx and tx.payment_status == Transaction.PaymentStatus.PENDING:
+            tx.payment_status = Transaction.PaymentStatus.WAIVED
+            tx.save(update_fields=['payment_status', 'updated_at'])
 
 
 # ── Pricing Calculation ───────────────────────────────────────────────────────

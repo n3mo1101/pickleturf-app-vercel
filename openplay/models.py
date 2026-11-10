@@ -112,6 +112,8 @@ class OpenPlayParticipant(models.Model):
             return
         if self.session.status == OpenPlaySession.Status.CANCELLED:
             raise ValidationError('This session has been cancelled.')
+        if self.session.status == OpenPlaySession.Status.COMPLETED:
+            raise ValidationError('This session has already ended.')
         if (
             self.session.is_full
             and self.status == self.Status.APPROVED

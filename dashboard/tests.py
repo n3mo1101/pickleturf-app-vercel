@@ -74,7 +74,8 @@ class ExportCsvTests(TestCase):
     def test_daily_export_with_range(self):
         self._login()
         Transaction.objects.create(
-            tx_type=Transaction.TxType.SALE, amount=100)
+            tx_type=Transaction.TxType.SALE, amount=100,
+            payment_status=Transaction.PaymentStatus.PAID)
         today = str(date.today())
         resp = self.client.get(self.url, {
             'type': 'daily', 'start': today, 'end': today,
@@ -85,10 +86,25 @@ class ExportCsvTests(TestCase):
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[1].startswith(today))
 
+    def test_daily_export_excludes_unpaid(self):
+        self._login()
+        Transaction.objects.create(
+            tx_type=Transaction.TxType.SALE, amount=100,
+            payment_status=Transaction.PaymentStatus.PENDING)
+        today = str(date.today())
+        resp = self.client.get(self.url, {
+            'type': 'daily', 'start': today, 'end': today,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            len(resp.content.decode().strip().splitlines()), 1
+        )
+
     def test_monthly_export_all(self):
         self._login()
         Transaction.objects.create(
-            tx_type=Transaction.TxType.SALE, amount=100)
+            tx_type=Transaction.TxType.SALE, amount=100,
+            payment_status=Transaction.PaymentStatus.PAID)
         resp = self.client.get(self.url, {'type': 'monthly'})
         self.assertEqual(resp.status_code, 200)
         self.assertIn(
@@ -131,27 +147,48 @@ class DashboardViewTests(TestCase):
              patch('dashboard.views.timezone.localtime', return_value=self.noon):
             return self.client.get(reverse('dashboard:index'))
 
-    def test_booking_counts_include_pending(self):
+    def test_booking_counts_include_reserved_and_missed(self):
         self._booking(time(9, 0), time(10, 0), Booking.Status.COMPLETED)
-        self._booking(time(13, 0), time(14, 0), Booking.Status.CONFIRMED)
-        self._booking(time(15, 0), time(16, 0), Booking.Status.PENDING)
+        self._booking(time(13, 0), time(14, 0), Booking.Status.RESERVED)
+        self._booking(time(15, 0), time(16, 0), Booking.Status.MISSED)
 
         context = self._dashboard().context
         self.assertEqual(context['bookings_today'], 3)
         self.assertEqual(context['bookings_completed_today'], 1)
-        self.assertEqual(context['bookings_pending_today'], 1)
+        self.assertEqual(context['bookings_reserved_today'], 1)
 
     def test_upcoming_bookings_exclude_ended(self):
         self._booking(time(9, 0), time(10, 0), Booking.Status.COMPLETED)
-        self._booking(time(11, 0), time(12, 30), Booking.Status.CONFIRMED)
-        self._booking(time(13, 0), time(14, 0), Booking.Status.CONFIRMED)
-        self._booking(time(15, 0), time(16, 0), Booking.Status.PENDING)
+        self._booking(time(11, 0), time(12, 30), Booking.Status.RESERVED)
+        self._booking(time(13, 0), time(14, 0), Booking.Status.RESERVED)
+        self._booking(time(15, 0), time(16, 0), Booking.Status.MISSED)
 
         upcoming = list(self._dashboard().context['todays_bookings'])
         self.assertEqual(len(upcoming), 3)
         self.assertNotIn(
             time(9, 0), [booking.start_time for booking in upcoming]
         )
+
+    def test_revenue_only_counts_paid_transactions(self):
+        Transaction.objects.create(
+            tx_type=Transaction.TxType.BOOKING,
+            amount=500,
+            payment_status=Transaction.PaymentStatus.PAID,
+        )
+        Transaction.objects.create(
+            tx_type=Transaction.TxType.BOOKING,
+            amount=400,
+            payment_status=Transaction.PaymentStatus.PENDING,
+        )
+        Transaction.objects.create(
+            tx_type=Transaction.TxType.BOOKING,
+            amount=300,
+            payment_status=Transaction.PaymentStatus.WAIVED,
+        )
+
+        context = self._dashboard().context
+        self.assertEqual(context['today_revenue'], 500)
+        self.assertEqual(context['month_revenue'], 500)
 
     def test_month_change_uses_previous_month(self):
         current = Transaction.objects.create(

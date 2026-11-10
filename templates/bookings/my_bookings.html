@@ -53,12 +53,14 @@
                 </td>
                 <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
                 <td data-label="Status">
-                    {% if b.status == 'confirmed' %}
-                        <span class="badge bg-success">Confirmed</span>
+                    {% if b.status == 'reserved' %}
+                        <span class="badge bg-success">Reserved</span>
                     {% elif b.status == 'cancelled' %}
                         <span class="badge bg-danger">Cancelled</span>
                     {% elif b.status == 'completed' %}
                         <span class="badge bg-secondary">Completed</span>
+                    {% elif b.status == 'missed' %}
+                        <span class="badge bg-secondary">Missed</span>
                     {% else %}
                         <span class="badge bg-warning">{{ b.get_status_display }}</span>
                     {% endif %}
@@ -73,7 +75,7 @@
                     {% endif %}
                 </td>
                 <td class="td-actions">
-                    {% if payments_enabled and b.status == 'pending' and b.transaction and b.transaction.payment_status == 'pending' and b.transaction.amount > 0 %}
+                    {% if payments_enabled and b.status == 'reserved' and b.transaction and b.transaction.payment_status == 'pending' and b.transaction.amount > 0 %}
                     <div class="dropdown">
                         <button class="btn btn-icon" type="button"
                                 data-bs-toggle="dropdown"

@@ -15,19 +15,21 @@ def _customer_home(request):
     from bookings.models import Booking
     from bookings.services import auto_update_booking_statuses
     from openplay.models import OpenPlaySession
+    from openplay.services import auto_update_session_statuses
     from announcements.models import Announcement
 
     today = date.today()
 
-    # Auto-update stale bookings on every home load
+    # Auto-update stale bookings and open play sessions on every home load
     auto_update_booking_statuses()
+    auto_update_session_statuses()
 
     upcoming_bookings = (
         Booking.objects
         .filter(
             user=request.user,
             date__gte=today,
-            status__in=['confirmed', 'pending']
+            status='reserved'
         )
         .select_related('court')
         .prefetch_related('slots')

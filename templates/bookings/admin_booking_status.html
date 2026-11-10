@@ -24,12 +24,34 @@
                             {{ booking.end_time|time:"g:i A" }}
                         {% endfor %}
                     </li>
-                    <li class="list-group-item"><strong>Notes:</strong> {{ booking.notes }}</li>
                     <li class="list-group-item"><strong>Current Status:</strong>
                         <span class="badge bg-secondary">{{ booking.get_status_display }}</span>
                     </li>
+                    <li class="list-group-item"><strong>Payment:</strong>
+                        {% if booking.transaction %}
+                            {% if booking.transaction.payment_status == 'paid' %}
+                                <span class="badge bg-success">Paid</span>
+                            {% elif booking.transaction.payment_status == 'pending' %}
+                                <span class="badge bg-warning">Unpaid</span>
+                            {% elif booking.transaction.payment_status == 'waived' %}
+                                <span class="badge bg-secondary">Waived</span>
+                            {% elif booking.transaction.payment_status == 'refunded' %}
+                                <span class="badge bg-danger">Refunded</span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    {{ booking.transaction.get_payment_status_display }}
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">No transaction</span>
+                        {% endif %}
+                    </li>
                 </ul>
-                <form method="post">
+                <form method="post"
+                      id="booking-status-form"
+                      data-booking-status-form
+                      data-booking-id="{{ booking.id }}"
+                      data-booking-label="{{ booking.court.name }} on {{ booking.date|date:'M d, Y' }}">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label fw-semibold">New Status</label>

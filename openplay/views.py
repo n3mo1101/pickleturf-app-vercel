@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 
+from datetime import date
+
 from accounts.decorators import admin_or_staff_required
 from .forms import AddParticipantForm, OpenPlaySessionForm
 from .models import OpenPlayParticipant, OpenPlaySession
@@ -14,6 +16,8 @@ from . import services
 @login_required
 def session_list_view(request):
     """Show upcoming open-play sessions to customers."""
+    services.auto_update_session_statuses()
+
     upcoming = services.get_upcoming_sessions()
     past     = services.get_past_sessions()
 
@@ -36,6 +40,8 @@ def session_list_view(request):
 @login_required
 def session_detail_view(request, pk):
     """Show session details and allow user to join/leave."""
+    services.auto_update_session_statuses()
+
     session = get_object_or_404(OpenPlaySession, pk=pk)
 
     # Get user's current participation status
@@ -79,17 +85,16 @@ def join_session_view(request, pk):
     if request.method == 'POST':
         try:
             services.request_join(request.user, session)
-            from transactions.payments import payments_enabled
-            if payments_enabled() and session.fee > 0:
+            if session.fee > 0:
                 messages.success(
                     request,
-                    f'✅ Join request for "{session.title}" received. '
-                    f'Complete payment to secure your spot.'
+                    f'✅ Request sent for "{session.title}". '
+                    f'Waiting for approval. Pay on-site or online.'
                 )
             else:
                 messages.success(
                     request,
-                    f'✅ Join request sent for "{session.title}". '
+                    f'✅ Request sent for "{session.title}". '
                     f'Waiting for admin approval.'
                 )
         except ValidationError as e:
@@ -120,6 +125,8 @@ def admin_session_list_view(request):
     """Admin sees all sessions with participant counts."""
     from django.db.models import Count, Q
 
+    services.auto_update_session_statuses()
+
     sessions = OpenPlaySession.objects.annotate(
         pending_count=Count(
             'participants',
@@ -127,15 +134,22 @@ def admin_session_list_view(request):
         )
     ).prefetch_related('participants').order_by('-date', '-start_time')
 
-    # Filter by status
+    # Filter by status and/or date
     status_filter = request.GET.get('status')
+    date_filter   = request.GET.get('date', '').strip()
     if status_filter:
         sessions = sessions.filter(status=status_filter)
+    if date_filter:
+        try:
+            sessions = sessions.filter(date=date.fromisoformat(date_filter))
+        except ValueError:
+            date_filter = ''
 
     return render(request, 'openplay/admin_session_list.html', {
         'sessions':       sessions,
         'status_choices': OpenPlaySession.Status.choices,
         'status_filter':  status_filter,
+        'date_filter':    date_filter,
     })
 
 
@@ -178,6 +192,8 @@ def admin_session_edit_view(request, pk):
 @admin_or_staff_required
 def admin_session_detail_view(request, pk):
     """Admin manages participants for a session."""
+    services.auto_update_session_statuses()
+
     session      = get_object_or_404(OpenPlaySession, pk=pk)
     participants = session.participants.select_related('user').order_by(
         'status', 'joined_at'

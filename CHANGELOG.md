@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-11-10 — Open play auto-completion
+
+### Changed
+- Open play sessions automatically move to `Completed` once their end time passes
+- Status refresh runs on open play page loads, the dashboard, the customer home, and the daily cron
+- Approving or adding participants on a completed or cancelled session is blocked
+- Late online payments for an ended session are automatically refunded
+
+## 2026-11-10 — Reservation statuses and paid-only revenue
+
+### Added
+- `Missed` booking status for unpaid reservations whose slot has passed
+- `Mark paid` action in booking row menus, including recovery for missed bookings with a waived charge
+- Search, status, court, and date filters on the staff bookings list
+- Customer name/email search on the All bookings list
+- Date filter on the open play manage page
+- Shared `mark_transaction_paid` service for manual payment collection
+- Confirmation prompt when a booking status changes to `Cancelled` or `Completed`
+
+### Changed
+- Booking statuses are now `Reserved`, `Completed`, `Missed`, and `Cancelled`; every new booking starts as `Reserved`
+- Revenue on the dashboard, charts, revenue CSV exports, customer totals, and the transactions tile counts paid transactions only
+- Completing a booking no longer marks its transaction paid
+- Auto-status refresh completes paid past bookings and marks unpaid ones `Missed` with the charge waived
+- Staff booking creation includes a checked-by-default `Mark as paid` option
+- Open play approvals and manual walk-in adds record a paid transaction; PayMongo payments keep their provider
+- Open play join flow shows `Request to join`, a waiting state, and a `Pay now` option
+- Staff bookings list now matches the All bookings layout and actions
+
+### Fixed
+- Date and time picker icons are visible in dark mode
+- Booking confirmation copy and submit label now use reservation wording
+
+### Removed
+- `Pending` and `Confirmed` booking statuses, migrated to `Reserved`
+- Notes input from the customer and staff booking forms
+
 ## 2026-11-08 — Interface refinements
 
 ### Changed

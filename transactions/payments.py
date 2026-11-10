@@ -391,10 +391,8 @@ def _fulfill_paid(data, pay_id=''):
 
 def _fulfill_order(tx):
     """Apply order-level effects of a successful payment."""
-    # Booking: payment confirms the booking (auto-confirm).
-    if tx.booking and tx.booking.status == 'pending':
-        tx.booking.status = 'confirmed'
-        tx.booking.save(update_fields=['status'])
+    # Bookings stay RESERVED — payment never changes booking status.
+    # (Completion/missed is decided when the slot passes.)
 
     # Open Play: payment approves the participant (pay-to-join).
     if tx.openplay and tx.openplay.status == 'pending':
@@ -402,10 +400,11 @@ def _fulfill_order(tx):
         try:
             approve_participant(tx.openplay)
         except ValidationError:
-            # Session became full before payment landed — refund and flag.
+            # Session filled or ended before payment landed — refund and flag.
             tx.payment_status = Transaction.PaymentStatus.REFUNDED
             tx.notes = (tx.notes + '\n' if tx.notes else '') + (
-                'Auto-refund: session full when payment arrived.'
+                'Auto-refund: session no longer accepting participants '
+                'when payment arrived.'
             )
             tx.save()
 

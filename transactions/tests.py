@@ -105,7 +105,7 @@ class BookingPaymentTests(BaseTestCase):
         self.assertEqual(b.transaction.amount, b.price)
 
     @override_settings(**TEST_KEYS)
-    def test_paid_webhook_confirms_multi_slot_booking(self):
+    def test_paid_webhook_marks_multi_slot_booking_paid(self):
         b = booking_services.create_booking(
             user=self.user, court=self.court,
             selected_date=date.today() + timedelta(days=1),
@@ -137,11 +137,11 @@ class BookingPaymentTests(BaseTestCase):
         tx.refresh_from_db()
         b.refresh_from_db()
         self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
-        self.assertEqual(b.status, Booking.Status.CONFIRMED)
+        self.assertEqual(b.status, Booking.Status.RESERVED)
         self.assertEqual(b.slots.count(), 2)
 
     @override_settings(**TEST_KEYS)
-    def test_paid_webhook_confirms_booking(self):
+    def test_paid_webhook_marks_transaction_paid(self):
         b = booking_services.create_booking(
             user=self.user, court=self.court,
             selected_date=date.today() + timedelta(days=1),
@@ -176,7 +176,7 @@ class BookingPaymentTests(BaseTestCase):
         self.assertEqual(tx.payment_method, 'gcash')
         self.assertEqual(tx.provider_payment_id, 'pay_0001')
         self.assertIsNotNone(tx.paid_at)
-        self.assertEqual(b.status, Booking.Status.CONFIRMED)
+        self.assertEqual(b.status, Booking.Status.RESERVED)
 
     @override_settings(**TEST_KEYS)
     def test_webhook_is_idempotent(self):
@@ -244,7 +244,7 @@ class BookingPaymentTests(BaseTestCase):
         tx.refresh_from_db()
         b.refresh_from_db()
         self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PENDING)
-        self.assertEqual(b.status, Booking.Status.PENDING)
+        self.assertEqual(b.status, Booking.Status.RESERVED)
 
     @override_settings(**TEST_KEYS)
     def test_webhook_endpoint_rejects_bad_signature(self):
@@ -359,6 +359,45 @@ class OpenPlayPaymentTests(BaseTestCase):
         self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
 
     @override_settings(**TEST_KEYS)
+    def test_paid_webhook_refunds_when_session_ended(self):
+        from openplay import services
+        sess = self._session()
+        participant = services.request_join(self.user, sess)
+        tx = Transaction.objects.get(openplay=participant)
+
+        sess.status = OpenPlaySession.Status.COMPLETED
+        sess.save(update_fields=['status'])
+
+        payload = json.loads(json.dumps({
+            'data': {
+                'type': 'checkout_session.payment.paid',
+                'data': {
+                    'id': 'cs_ended_1',
+                    'attributes': {
+                        'reference_number': str(tx.pk),
+                        'payments': [{
+                            'id': 'pay_ended_1',
+                            'attributes': {
+                                'amount': int(tx.amount * 100),
+                                'status': 'paid',
+                                'source': {'type': 'gcash'},
+                            },
+                        }],
+                    },
+                },
+            },
+        }))
+        payments.handle_webhook_payload(payload)
+
+        tx.refresh_from_db()
+        participant.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.REFUNDED)
+        self.assertIn('no longer accepting participants', tx.notes)
+        self.assertEqual(
+            participant.status, OpenPlayParticipant.Status.PENDING
+        )
+
+    @override_settings(**TEST_KEYS)
     def test_free_session_keeps_admin_approval_flow(self):
         sess = self._session(fee=0)
         from openplay import services
@@ -466,3 +505,64 @@ class CheckoutViewTests(BaseTestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.url, 'https://checkout.paymongo.com/reused')
         mock_post.assert_not_called()
+
+
+class MarkPaidViewTests(BaseTestCase):
+    @override_settings(**TEST_KEYS)
+    def test_mark_paid_records_payment_without_completing_booking(self):
+        b = booking_services.create_booking(
+            user=self.user, court=self.court,
+            selected_date=date.today() + timedelta(days=1),
+            start_time=dtime(9, 0),
+            payment_method='online',
+        )
+        tx = b.transaction
+        self.client.login(email='admin@example.com', password='pass12345')
+        resp = self.client.post(
+            reverse('transactions:mark_paid', args=[tx.pk]),
+            {'next': reverse('transactions:list')},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('transactions:list'))
+        tx.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertIsNotNone(tx.paid_at)
+        self.assertEqual(tx.provider, Transaction.Provider.ONSITE)
+        self.assertEqual(b.status, Booking.Status.RESERVED)
+
+    def test_mark_paid_recovers_waived_missed_booking(self):
+        b = Booking.objects.create(
+            user=self.user,
+            court=self.court,
+            date=date.today() - timedelta(days=1),
+            start_time=dtime(9, 0),
+            end_time=dtime(10, 0),
+            status=Booking.Status.MISSED,
+            price=350,
+        )
+        tx = Transaction.objects.create(
+            user=self.user,
+            tx_type=Transaction.TxType.BOOKING,
+            amount=350,
+            booking=b,
+            payment_status=Transaction.PaymentStatus.WAIVED,
+            provider=Transaction.Provider.ONSITE,
+        )
+        self.client.login(email='admin@example.com', password='pass12345')
+        self.client.post(reverse('transactions:mark_paid', args=[tx.pk]))
+        tx.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertEqual(b.status, Booking.Status.MISSED)
+
+    def test_mark_paid_rejects_unsafe_next(self):
+        tx = Transaction.objects.create(
+            tx_type=Transaction.TxType.SALE, amount=100,
+        )
+        self.client.login(email='admin@example.com', password='pass12345')
+        resp = self.client.post(
+            reverse('transactions:mark_paid', args=[tx.pk]),
+            {'next': 'https://evil.example/'},
+        )
+        self.assertEqual(resp.url, reverse('transactions:list'))

@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import models
+from django.db.models import Q
 from django.views.decorators.http import require_GET
 from courts.models import Court
 from accounts.decorators import admin_or_staff_required
@@ -89,6 +90,9 @@ def booking_create_view(request):
             elif not payments_enabled():
                 payment_method = 'onsite'
 
+            # Staff can settle the charge immediately (default: checked).
+            mark_paid = bool(request.POST.get('mark_paid')) and is_admin
+
             try:
                 booking = services.create_booking(
                     user=request.user,
@@ -97,6 +101,7 @@ def booking_create_view(request):
                     start_times=slots,
                     notes=data.get('notes', ''),
                     payment_method=payment_method,
+                    mark_paid=mark_paid,
                 )
             except ValidationError as e:
                 form.add_error(None, str(e))
@@ -104,7 +109,15 @@ def booking_create_view(request):
             else:
                 slot_count  = booking.slot_count
                 total_price = booking.price
-                if payment_method == 'online' and payments_enabled() and not is_admin:
+                if mark_paid:
+                    messages.success(
+                        request,
+                        f'✅ {slot_count} slot(s) reserved on '
+                        f'{parsed_date.strftime("%b %d, %Y")} '
+                        f'for {data["court"]}. '
+                        f'Total: ₱{total_price} — marked as paid.'
+                    )
+                elif payment_method == 'online' and payments_enabled() and not is_admin:
                     messages.success(
                         request,
                         f'✅ {slot_count} slot(s) reserved on '
@@ -115,10 +128,10 @@ def booking_create_view(request):
                 else:
                     messages.success(
                         request,
-                        f'✅ {slot_count} slot(s) booked on '
+                        f'✅ {slot_count} slot(s) reserved on '
                         f'{parsed_date.strftime("%b %d, %Y")} '
                         f'for {data["court"]}. '
-                        f'Total: ₱{total_price} — confirmed, pay on-site.'
+                        f'Total: ₱{total_price} — pay on-site.'
                     )
 
                 if is_admin:
@@ -175,7 +188,8 @@ def my_bookings_view(request):
     services.auto_update_booking_statuses()  # Ensure statuses are up-to-date before fetching
 
     from django.core.paginator import Paginator
-    from django.db.models import Sum, Count
+    from django.db.models import Count
+    from transactions.models import Transaction
 
     all_bookings = (
         Booking.objects
@@ -185,18 +199,17 @@ def my_bookings_view(request):
         .order_by('-date', '-start_time')
     )
 
-    # ── Summary ────────────────────────────────────────────────────
-    summary = all_bookings.aggregate(
-        total_bookings=Count('id'),
-        total_spent=Sum(
-            'price',
-            filter=models.Q(
-                status__in=[
-                    Booking.Status.CONFIRMED,
-                    Booking.Status.COMPLETED,
-                ]
-            )
+    # ── Summary (paid bookings only count as money spent) ──────────
+    total_bookings = all_bookings.aggregate(
+        total=Count('id')
+    )['total'] or 0
+    total_spent = (
+        Transaction.objects
+        .filter(
+            booking__user=request.user,
+            payment_status=Transaction.PaymentStatus.PAID,
         )
+        .aggregate(total=models.Sum('amount'))['total'] or 0
     )
 
     # ── Pagination ─────────────────────────────────────────────────
@@ -206,8 +219,8 @@ def my_bookings_view(request):
 
     return render(request, 'bookings/my_bookings.html', {
         'bookings':       bookings,
-        'total_bookings': summary['total_bookings'] or 0,
-        'total_spent':    summary['total_spent']    or 0,
+        'total_bookings': total_bookings,
+        'total_spent':    total_spent,
         'payments_enabled': payments_enabled(),
     })
 
@@ -237,7 +250,7 @@ def admin_booking_list_view(request):
     bookings = (
         Booking.objects
         .select_related('court', 'user')
-        .prefetch_related('slots')
+        .prefetch_related('slots', 'transaction')
         .order_by('-date', '-start_time')
     )
 
@@ -245,6 +258,7 @@ def admin_booking_list_view(request):
     status_filter = request.GET.get('status')
     date_filter   = request.GET.get('date')
     court_filter  = request.GET.get('court')
+    q             = request.GET.get('q', '').strip()
 
     if status_filter:
         bookings = bookings.filter(status=status_filter)
@@ -252,6 +266,12 @@ def admin_booking_list_view(request):
         bookings = bookings.filter(date=date_filter)
     if court_filter:
         bookings = bookings.filter(court_id=court_filter)
+    if q:
+        bookings = bookings.filter(
+            Q(user__first_name__icontains=q)
+            | Q(user__last_name__icontains=q)
+            | Q(user__email__icontains=q)
+        )
 
     return render(request, 'bookings/admin_booking_list.html', {
         'bookings':       bookings,
@@ -260,6 +280,7 @@ def admin_booking_list_view(request):
         'status_filter':  status_filter,
         'date_filter':    date_filter,
         'court_filter':   court_filter,
+        'q':              q,
     })
 
 
@@ -275,15 +296,19 @@ def admin_booking_cancel_view(request, pk):
     """Admin cancels any booking."""
     booking = get_object_or_404(Booking, pk=pk)
 
+    redirect_url = request.POST.get('next') or 'bookings:admin_list'
+    if not redirect_url.startswith('/') or redirect_url.startswith('//'):
+        redirect_url = 'bookings:admin_list'
+
     if request.method == 'POST':
         try:
             services.cancel_booking(booking, cancelled_by=request.user)
             messages.success(request, f'Booking #{pk} cancelled.')
         except ValidationError as e:
             messages.error(request, str(e))
-        return redirect('bookings:admin_list')
+        return redirect(redirect_url)
 
-    return redirect('bookings:admin_list')
+    return redirect(redirect_url)
 
 
 @admin_or_staff_required
@@ -318,7 +343,7 @@ def admin_booking_status_view(request, pk):
     )
     return render(request, template, {
         'booking':        booking,
-        'status_choices': Booking.Status.choices,
+        'status_choices': Booking.EDITABLE_STATUSES,
         'next':           next_url or '',
     })
 
@@ -331,20 +356,51 @@ def staff_bookings_view(request):
     """
     from django.core.paginator import Paginator
 
+    services.auto_update_booking_statuses()
+
     bookings = (
         Booking.objects
         .filter(created_by=request.user)
         .select_related('court', 'user')
-        .prefetch_related('slots')
+        .prefetch_related('slots', 'transaction')
         .order_by('-date', '-start_time')
     )
+
+    status_filter = request.GET.get('status')
+    date_filter   = request.GET.get('date')
+    court_filter  = request.GET.get('court')
+    q             = request.GET.get('q', '').strip()
+
+    if status_filter:
+        bookings = bookings.filter(status=status_filter)
+    if date_filter:
+        bookings = bookings.filter(date=date_filter)
+    if court_filter:
+        bookings = bookings.filter(court_id=court_filter)
+    if q:
+        bookings = bookings.filter(
+            Q(user__first_name__icontains=q)
+            | Q(user__last_name__icontains=q)
+            | Q(user__email__icontains=q)
+        )
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    query_string = query_params.urlencode()
 
     paginator = Paginator(bookings, 10)
     page      = request.GET.get('page', 1)
     bookings  = paginator.get_page(page)
 
     return render(request, 'bookings/staff_bookings.html', {
-        'bookings': bookings,
+        'bookings':       bookings,
+        'courts':         Court.objects.filter(is_active=True),
+        'status_choices': Booking.Status.choices,
+        'status_filter':  status_filter,
+        'date_filter':    date_filter,
+        'court_filter':   court_filter,
+        'q':              q,
+        'query_string':   query_string,
     })
 
 
@@ -367,4 +423,8 @@ def cron_update_statuses(request):
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
     services.auto_update_booking_statuses()
+
+    from openplay.services import auto_update_session_statuses
+    auto_update_session_statuses()
+
     return JsonResponse({'status': 'ok'})

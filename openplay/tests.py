@@ -13,6 +13,7 @@ from openplay.services import (
     reject_participant,
     add_participant_manually,
     cancel_session,
+    auto_update_session_statuses,
 )
 
 User = get_user_model()
@@ -84,6 +85,57 @@ class OpenPlayServiceTests(TestCase):
         p.refresh_from_db()
         self.assertEqual(p.status, OpenPlayParticipant.Status.APPROVED)
 
+    def test_approval_records_paid_transaction(self):
+        from transactions.models import Transaction
+        p = request_join(self.user1, self.session)
+        approve_participant(p)
+        tx = Transaction.objects.get(openplay=p)
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertEqual(tx.provider, Transaction.Provider.ONSITE)
+        self.assertIsNotNone(tx.paid_at)
+
+    def test_approval_settles_existing_pending_transaction(self):
+        from transactions.models import Transaction
+        p = request_join(self.user1, self.session)
+        tx, _ = Transaction.objects.get_or_create(
+            openplay=p,
+            defaults={
+                'user': self.user1,
+                'tx_type': Transaction.TxType.OPENPLAY,
+                'amount': self.session.fee,
+                'provider': Transaction.Provider.PAYMONGO,
+            },
+        )
+        approve_participant(p)
+        tx.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        # Approval settles at the desk, so the pending charge becomes on-site.
+        self.assertEqual(tx.provider, Transaction.Provider.ONSITE)
+        self.assertEqual(
+            Transaction.objects.filter(openplay=p).count(), 1
+        )
+
+    def test_approval_keeps_already_paid_provider(self):
+        from transactions.models import Transaction
+        p = request_join(self.user1, self.session)
+        tx, _ = Transaction.objects.get_or_create(
+            openplay=p,
+            defaults={
+                'user': self.user1,
+                'tx_type': Transaction.TxType.OPENPLAY,
+                'amount': self.session.fee,
+                'provider': Transaction.Provider.PAYMONGO,
+                'payment_status': Transaction.PaymentStatus.PAID,
+            },
+        )
+        tx.payment_status = Transaction.PaymentStatus.PAID
+        tx.provider = Transaction.Provider.PAYMONGO
+        tx.save(update_fields=['payment_status', 'provider'])
+        approve_participant(p)
+        tx.refresh_from_db()
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertEqual(tx.provider, Transaction.Provider.PAYMONGO)
+
     def test_admin_can_reject_participant(self):
         p = request_join(self.user1, self.session)
         reject_participant(p)
@@ -139,6 +191,17 @@ class OpenPlayServiceTests(TestCase):
         self.assertEqual(p.display_name, 'Walk In Guest')
         self.assertIsNone(p.user)
 
+    def test_manual_add_records_paid_transaction(self):
+        from transactions.models import Transaction
+        p = add_participant_manually(
+            admin_user=self.admin,
+            session=self.session,
+            participant_name='Walk In Guest',
+        )
+        tx = Transaction.objects.get(openplay=p)
+        self.assertEqual(tx.payment_status, Transaction.PaymentStatus.PAID)
+        self.assertEqual(tx.amount, self.session.fee)
+
     def test_manual_add_to_cancelled_session_raises_error(self):
         cancel_session(self.session)
         with self.assertRaises(ValidationError):
@@ -161,6 +224,131 @@ class OpenPlayServiceTests(TestCase):
         cancel_session(self.session)
         with self.assertRaises(ValidationError):
             request_join(self.user1, self.session)
+
+
+class OpenPlayAutoStatusTests(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email='autostatus-admin@test.com',
+            password='testpass123',
+            first_name='Auto',
+            last_name='Admin',
+            role='admin',
+            is_staff=True,
+        )
+
+    def _session(self, **kwargs):
+        defaults = dict(
+            title='Auto Session',
+            date=date.today() + timedelta(days=1),
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            capacity=8,
+            fee=0,
+            created_by=self.admin,
+        )
+        defaults.update(kwargs)
+        return OpenPlaySession.objects.create(**defaults)
+
+    def _pending_participant(self, session):
+        return OpenPlayParticipant.objects.create(
+            session=session,
+            user=None,
+            participant_name='Pending Guest',
+            status=OpenPlayParticipant.Status.PENDING,
+        )
+
+    # ── Auto status ───────────────────────────────────────────
+
+    def test_past_open_session_becomes_completed(self):
+        session = self._session(date=date.today() - timedelta(days=1))
+        auto_update_session_statuses()
+        session.refresh_from_db()
+        self.assertEqual(session.status, OpenPlaySession.Status.COMPLETED)
+
+    def test_past_full_session_becomes_completed(self):
+        session = self._session(
+            date=date.today() - timedelta(days=1),
+            status=OpenPlaySession.Status.FULL,
+        )
+        auto_update_session_statuses()
+        session.refresh_from_db()
+        self.assertEqual(session.status, OpenPlaySession.Status.COMPLETED)
+
+    def test_future_session_stays_open(self):
+        session = self._session(date=date.today() + timedelta(days=2))
+        auto_update_session_statuses()
+        session.refresh_from_db()
+        self.assertEqual(session.status, OpenPlaySession.Status.OPEN)
+
+    def test_cancelled_session_is_not_completed(self):
+        session = self._session(
+            date=date.today() - timedelta(days=1),
+            status=OpenPlaySession.Status.CANCELLED,
+        )
+        auto_update_session_statuses()
+        session.refresh_from_db()
+        self.assertEqual(session.status, OpenPlaySession.Status.CANCELLED)
+
+    def test_completed_session_stays_completed(self):
+        session = self._session(
+            date=date.today() - timedelta(days=2),
+            status=OpenPlaySession.Status.COMPLETED,
+        )
+        auto_update_session_statuses()
+        session.refresh_from_db()
+        self.assertEqual(session.status, OpenPlaySession.Status.COMPLETED)
+
+    # ── Closed-session guards ─────────────────────────────────
+
+    def test_approve_on_completed_session_is_blocked(self):
+        from transactions.models import Transaction
+        session = self._session(
+            date=date.today() - timedelta(days=1),
+            status=OpenPlaySession.Status.COMPLETED,
+            fee=100,
+        )
+        participant = self._pending_participant(session)
+
+        with self.assertRaises(ValidationError):
+            approve_participant(participant)
+
+        participant.refresh_from_db()
+        self.assertEqual(
+            participant.status, OpenPlayParticipant.Status.PENDING
+        )
+        self.assertFalse(
+            Transaction.objects.filter(openplay=participant).exists()
+        )
+
+    def test_add_on_completed_session_is_blocked(self):
+        session = self._session(
+            date=date.today() - timedelta(days=1),
+            status=OpenPlaySession.Status.COMPLETED,
+        )
+        with self.assertRaises(ValidationError):
+            add_participant_manually(
+                admin_user=self.admin,
+                session=session,
+                participant_name='Walk-in Guest',
+            )
+        self.assertEqual(session.participants.count(), 0)
+
+    def test_approve_on_cancelled_session_is_blocked(self):
+        session = self._session(
+            date=date.today() + timedelta(days=1),
+            status=OpenPlaySession.Status.CANCELLED,
+        )
+        participant = self._pending_participant(session)
+
+        with self.assertRaises(ValidationError):
+            approve_participant(participant)
+
+        participant.refresh_from_db()
+        self.assertEqual(
+            participant.status, OpenPlayParticipant.Status.PENDING
+        )
 
 
 class OpenPlayAdminConfirmationTests(TestCase):

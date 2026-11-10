@@ -1,6 +1,6 @@
 from datetime import date
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
@@ -13,7 +13,6 @@ import json
 logger = logging.getLogger(__name__)
 
 from accounts.decorators import admin_or_staff_required
-from bookings.models import Booking
 from .models import Transaction
 from . import payments
 
@@ -56,13 +55,14 @@ def transaction_list_view(request):
         except ValueError:
             pass
 
-    # ── Running Total of Filtered Results ─────────────────────────
-    filtered_total = transactions.aggregate(
-        total=Sum('amount'),
-        count=Count('id'),
+    # ── Running totals of filtered results ────────────────────────
+    # Revenue only counts paid rows; the count covers every filtered row.
+    paid_total = (
+        transactions
+        .filter(payment_status=Transaction.PaymentStatus.PAID)
+        .aggregate(total=Sum('amount'))['total'] or 0
     )
-    total_amount = filtered_total['total'] or 0
-    total_count  = filtered_total['count'] or 0
+    total_count = transactions.aggregate(count=Count('id'))['count'] or 0
 
     # ── Pagination ─────────────────────────────────────────────────
     paginator    = Paginator(transactions, 20)
@@ -82,7 +82,7 @@ def transaction_list_view(request):
         'status_filter':  status_filter,
         'date_from':      date_from,
         'date_to':        date_to,
-        'total_amount':   total_amount,
+        'paid_total':     paid_total,
         'total_count':    total_count,
         'query_string':   query_string,
     })
@@ -92,45 +92,21 @@ def transaction_list_view(request):
 def mark_paid_view(request, pk):
     """
     Manually mark a transaction as Paid (on-site / manual payments).
-    A linked booking is only completed after its last slot has passed.
-    """
-    from datetime import datetime as dt
-    from django.utils import timezone
 
+    This is payment-only: booking status is never changed here, so
+    completion no longer implies a collected charge (and vice versa).
+    """
     transaction = get_object_or_404(Transaction, pk=pk)
 
     if request.method == 'POST':
-        if not transaction.paid_at:
-            transaction.paid_at = timezone.now()
-        transaction.payment_status = Transaction.PaymentStatus.PAID
-        transaction.save(update_fields=['payment_status', 'paid_at'])
+        from .services import mark_transaction_paid
 
-        booking_completed = False
-        booking_confirmed = False
-        if transaction.booking:
-            booking = transaction.booking
-            # A reservation is complete only after its last slot ends.
-            slot_dt = timezone.make_aware(
-                dt.combine(booking.date, booking.end_time)
-            )
-            if booking.status == Booking.Status.PENDING:
-                booking.status = Booking.Status.CONFIRMED
-                booking.save(update_fields=['status', 'updated_at'])
-                booking_confirmed = True
-            if slot_dt <= timezone.now() and booking.status not in (
-                Booking.Status.COMPLETED, Booking.Status.CANCELLED
-            ):
-                booking.status = Booking.Status.COMPLETED
-                booking.save(update_fields=['status', 'updated_at'])
-                booking_completed = True
-            messages.success(
-                request,
-                f'Transaction #{pk} marked as paid.'
-                + (' Booking confirmed.' if booking_confirmed else '')
-                + (' Booking completed.' if booking_completed else ''),
-            )
-        else:
-            messages.success(request, f'Transaction #{pk} marked as paid.')
+        mark_transaction_paid(
+            transaction, provider=Transaction.Provider.ONSITE
+        )
+        messages.success(
+            request, f'Transaction #{pk} marked as paid.'
+        )
 
     # Preserve filters when redirecting back (relative path only)
     redirect_url = request.POST.get('next') or 'transactions:list'

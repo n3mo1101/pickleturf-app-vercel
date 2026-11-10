@@ -1,9 +1,50 @@
+from datetime import datetime
+
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from .models import OpenPlaySession, OpenPlayParticipant
 
 
 # ── Session Helpers ────────────────────────────────────────────────────────────
+
+def auto_update_session_statuses():
+    """
+    Mark open play sessions as completed once their end time has passed.
+
+    Mirrors booking auto-updates: only OPEN/FULL sessions are considered,
+    and cancelled or already-completed sessions are left untouched.
+    Called by the daily cron, page loads, the dashboard, and the customer
+    home so stale sessions never stay "upcoming".
+    """
+    now = timezone.now()
+    today = timezone.localdate()
+
+    sessions = OpenPlaySession.objects.filter(
+        status__in=[
+            OpenPlaySession.Status.OPEN,
+            OpenPlaySession.Status.FULL,
+        ],
+        date__lte=today,
+    )
+
+    for session in sessions:
+        end_dt = timezone.make_aware(
+            datetime.combine(session.date, session.end_time)
+        )
+        if end_dt > now:
+            continue   # still running or in the future
+
+        session.status = OpenPlaySession.Status.COMPLETED
+        session.save(update_fields=['status'])
+
+
+def _ensure_session_accepts_participants(session):
+    """Reject approvals/additions once a session is closed or has ended."""
+    if session.status == OpenPlaySession.Status.CANCELLED:
+        raise ValidationError('This session has been cancelled.')
+    if session.status == OpenPlaySession.Status.COMPLETED:
+        raise ValidationError('This session has already ended.')
+
 
 def get_upcoming_sessions():
     """Return all open/upcoming sessions sorted by date."""
@@ -87,6 +128,8 @@ def leave_session(user, session):
 
 def approve_participant(participant):
     """Admin approves a pending join request."""
+    _ensure_session_accepts_participants(participant.session)
+
     if participant.session.is_full:
         raise ValidationError('Session is full. Cannot approve more participants.')
 
@@ -94,8 +137,8 @@ def approve_participant(participant):
     participant.save(update_fields=['status'])
     participant.session.update_status()
 
-    # Create transaction record
-    _create_openplay_transaction(participant)
+    # Approval implies an on-site/cash settlement.
+    _settle_openplay_payment(participant)
     return participant
 
 
@@ -111,8 +154,8 @@ def add_participant_manually(admin_user, session, participant_name):
     Admin directly adds a user to a session as approved.
     Adds a walk-in participant by name.
     """
-    if session.status == OpenPlaySession.Status.CANCELLED:
-        raise ValidationError('Cannot add to a cancelled session.')
+    _ensure_session_accepts_participants(session)
+
     if session.is_full:
         raise ValidationError('Session is full.')
 
@@ -124,7 +167,7 @@ def add_participant_manually(admin_user, session, participant_name):
     )
 
     session.update_status()
-    _create_openplay_transaction(participant)
+    _create_openplay_transaction(participant, paid=True)
     return participant
 
 
@@ -145,9 +188,39 @@ def cancel_session(session):
     return session
 
 
-def _create_openplay_transaction(participant, provider=None):
-    """Create a pending transaction for an approved open-play participant."""
+def _settle_openplay_payment(participant):
+    """
+    Settlement for an approved participant.
+
+    An existing online transaction (created when they requested to join)
+    is marked paid; otherwise a paid on-site transaction is created.
+    Already-paid transactions keep their provider (e.g. PayMongo).
+    """
     from transactions.models import Transaction
+    from transactions.services import mark_transaction_paid
+
+    tx = (
+        Transaction.objects
+        .filter(openplay=participant)
+        .order_by('-created_at')
+        .first()
+    )
+    if tx:
+        if tx.payment_status != Transaction.PaymentStatus.PAID:
+            mark_transaction_paid(
+                tx, provider=Transaction.Provider.ONSITE
+            )
+        return tx
+
+    return _create_openplay_transaction(participant, paid=True)
+
+
+def _create_openplay_transaction(participant, provider=None, paid=False):
+    """Create the (single) transaction for an open-play participant."""
+    from django.utils import timezone
+
+    from transactions.models import Transaction
+
     # Avoid duplicate transactions
     if Transaction.objects.filter(openplay=participant).exists():
         return
@@ -158,6 +231,11 @@ def _create_openplay_transaction(participant, provider=None):
         tx_type=Transaction.TxType.OPENPLAY,
         amount=participant.session.fee,
         openplay=participant,
+        payment_status=(
+            Transaction.PaymentStatus.PAID if paid
+            else Transaction.PaymentStatus.PENDING
+        ),
+        paid_at=timezone.now() if paid else None,
         provider=provider or Transaction.Provider.ONSITE,
         description=(
             f'{participant.session.title} '

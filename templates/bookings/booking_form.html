@@ -107,11 +107,21 @@
                             </div>
                         </div>
 
-                        {# Notes #}
-                        <div class="mb-3">
-                            <label class="form-label">Notes (optional)</label>
-                            {{ form.notes }}
+                        {# ── Mark as paid (staff walk-in only) ── #}
+                        {% if is_admin %}
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox"
+                                   name="mark_paid" id="mark-paid"
+                                   value="1" checked>
+                            <label class="form-check-label fw-semibold"
+                                   for="mark-paid">
+                                Mark as paid
+                                <span class="text-muted fw-normal">
+                                    <small>(Cash received. Uncheck to leave unpaid)</small>
+                                </span>
+                            </label>
                         </div>
+                        {% endif %}
 
                         {# ── Payment Method ── #}
                         <div class="mb-3">
@@ -125,7 +135,7 @@
                                     <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
                                     <div class="flex-grow-1">
                                         <div class="fw-semibold"><i class="bi bi-shop text-icon"></i> On-site</div>
-                                        <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
+                                        <small class="text-muted">Reserve now, pay at the counter. Your slot is held immediately.</small>
                                     </div>
                                     <span class="badge bg-success">Cash</span>
                                 </label>
@@ -136,7 +146,7 @@
                                     <input type="radio" name="payment_method" value="onsite" class="form-check-input m-0 payment-radio" checked>
                                     <div class="flex-grow-1">
                                         <div class="fw-semibold"><i class="bi bi-shop text-icon"></i> Pay on-site</div>
-                                        <small class="text-muted">Confirm now, pay at the counter. Booking is confirmed immediately.</small>
+                                        <small class="text-muted">Reserve now, pay at the counter. Your slot is held immediately.</small>
                                     </div>
                                     <span class="badge bg-success">On-site</span>
                                 </label>
@@ -144,7 +154,7 @@
                                     <input type="radio" name="payment_method" value="online" class="form-check-input m-0 payment-radio">
                                     <div class="flex-grow-1">
                                         <div class="fw-semibold"><i class="bi bi-phone text-icon"></i> Pay online <small class="text-muted">(GCash / Card)</small></div>
-                                        <small class="text-muted">Reserve now, pay via PayMongo. Confirmed after payment.</small>
+                                        <small class="text-muted">Reserve now, pay via PayMongo. Your slot is held while you pay.</small>
                                     </div>
                                     <span class="badge bg-primary">Pay Now</span>
                                 </label>
@@ -165,7 +175,7 @@
                             <button type="submit" class="btn btn-primary btn-lg"
                                     id="submit-btn" disabled>
                                 <i class="bi bi-check-circle"></i>
-                                Confirm booking
+                                Reserve booking
                             </button>
                             <a href="{% url 'bookings:availability' %}"
                                class="btn btn-outline-secondary">

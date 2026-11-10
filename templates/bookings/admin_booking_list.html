@@ -16,6 +16,9 @@
 
 {# ── Filters ── #}
 <form method="get" class="pt-filters">
+    <input type="search" name="q" class="form-control"
+           placeholder="Search customer name or email"
+           value="{{ q }}">
     <select name="status" class="form-select">
         <option value="">All statuses</option>
         {% for val, label in status_choices %}
@@ -68,9 +71,10 @@
                 </td>
                 <td data-label="Price">₱{{ b.price|floatformat:2 }}</td>
                 <td data-label="Status">
-                    {% if b.status == 'confirmed' %}<span class="badge bg-success">Confirmed</span>
+                    {% if b.status == 'reserved' %}<span class="badge bg-success">Reserved</span>
                     {% elif b.status == 'cancelled' %}<span class="badge bg-danger">Cancelled</span>
                     {% elif b.status == 'completed' %}<span class="badge bg-secondary">Completed</span>
+                    {% elif b.status == 'missed' %}<span class="badge bg-secondary">Missed</span>
                     {% else %}<span class="badge bg-warning">{{ b.get_status_display }}</span>
                     {% endif %}
                     {% if b.transaction %}
@@ -97,6 +101,41 @@
                                     <i class="bi bi-pencil"></i> Update status
                                 </a>
                             </li>
+                            {% if b.transaction %}
+                                {% if b.transaction.payment_status == 'pending' %}
+                                <li>
+                                    <form method="post"
+                                          action="{% url 'transactions:mark_paid' b.transaction.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Mark as paid"
+                                          data-pt-confirm-body="Record ₱{{ b.transaction.amount|floatformat:2 }} as paid for booking #{{ b.id }} ({{ b.user.full_name }})? This cannot be undone."
+                                          data-pt-confirm-label="Mark paid"
+                                          data-pt-confirm-class="btn-primary">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="bi bi-check-circle"></i> Mark paid
+                                        </button>
+                                    </form>
+                                </li>
+                                {% elif b.transaction.payment_status == 'waived' and b.status == 'missed' %}
+                                <li>
+                                    <form method="post"
+                                          action="{% url 'transactions:mark_paid' b.transaction.pk %}"
+                                          data-pt-confirm
+                                          data-pt-confirm-title="Mark as paid"
+                                          data-pt-confirm-body="Record ₱{{ b.transaction.amount|floatformat:2 }} as paid for missed booking #{{ b.id }} ({{ b.user.full_name }})? This cannot be undone."
+                                          data-pt-confirm-label="Mark paid"
+                                          data-pt-confirm-class="btn-primary">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="dropdown-item">
+                                            <i class="bi bi-check-circle"></i> Mark paid
+                                        </button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                            {% endif %}
                             {% if b.is_cancellable %}
                             <li><hr class="dropdown-divider"></li>
                             <li>

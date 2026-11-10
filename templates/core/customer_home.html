@@ -83,12 +83,12 @@
                             <div class="fw-bold text-navy">
                                 ₱{{ b.price }}
                             </div>
-                            {% if b.status == 'confirmed' %}
-                            <span class="badge bg-success">Confirmed</span>
-                            {% elif b.status == 'pending' %}
-                            <span class="badge bg-warning">
-                                Pending
-                            </span>
+                            {% if b.status == 'reserved' %}
+                            <span class="badge bg-success">Reserved</span>
+                            {% elif b.status == 'missed' %}
+                            <span class="badge bg-secondary">Missed</span>
+                            {% elif b.status == 'completed' %}
+                            <span class="badge bg-secondary">Completed</span>
                             {% endif %}
                         </div>
                     </li>
