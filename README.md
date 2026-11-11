@@ -1,122 +1,111 @@
-# PickleTurf App
+# PickleTurf
 
-A web-based management system for a single pickleball facility.
-Built to handle court bookings, open play sessions, equipment sales and rentals,
-inventory management, and business analytics — all in one place.
+A web-based management system for a single pickleball facility — court reservations,
+open play, equipment sales and rentals, inventory, online payments, and analytics.
 
 ---
 
-## 🚀 Features
+## Features
 
-### 📱 Customer
-- Register and log in via email/password or Google OAuth
-- Book courts by selecting available time slots (multi-slot, hourly pricing)
+### Customer
+- Sign up / log in with email (or Google / Facebook) via `django-allauth`
+- Reserve one or more hourly court slots with live price breakdown
+- Pay online via PayMongo (GCash) or choose pay-on-site
 - Join open play sessions and track approval status
-- View booking history with summary and pagination
-- Browse the equipment shop
-- View active announcements on the home page
+- View booking history, browse the shop, read announcements
+- Light and dark theme
 
-### 🧑‍💻 Admin / Staff
-- Dashboard with revenue charts, booking stats, and court utilization
-- Manage court bookings — create, confirm, cancel, and track status
-- Create and manage open play sessions, approve or reject participants
-- Point-of-sale interface for recording equipment purchases
-- Rental POS for processing equipment rentals
-- Full inventory management — items, categories, stock adjustments
-- Transaction history with filters, date range, and CSV export
-- Announcement system with live preview and banner display
-- Role-based access control (Admin, Staff, Customer)
+### Admin / Staff
+- Dashboard KPIs, revenue charts, and court utilization
+- Reservations with `Reserved` / `Completed` / `Missed` / `Cancelled` statuses
+- Search and filter by status, court, and date; manual `Mark paid`
+- Open play creation, participant approval, and walk-in registration
+- POS for equipment sales and equipment rentals
+- Inventory items (`For Sale` or `For Rent`), stock adjustments, sale/rental history
+- Transaction history with filters and CSV export
+- Announcement CRUD with live preview
+- Role-based access: Admin, Staff, Customer
 
 ---
 
-## ⚙️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | Django 4.2 (Python) |
-| Database | PostgreSQL |
-| Authentication | django-allauth (email + Google OAuth) |
-| Frontend | Django Templates, Bootstrap 5, Chart.js |
-| Styling | Custom CSS (Navy + Yellow theme, dark mode) |
-| Static Files | WhiteNoise |
-| Media Files | Cloudinary |
+| Backend | Django 6.0 (Python 3.12) |
+| Database | PostgreSQL (Supabase) via `DATABASE_URL` |
+| Auth | django-allauth (email / Google / Facebook) |
+| Payments | PayMongo (GCash), webhook-verified |
+| Frontend | Django templates, Bootstrap 5, crispy-bootstrap5, Chart.js |
+| Static files | WhiteNoise |
+| Media | Cloudinary |
 | Server | Gunicorn |
-| Hosting | Render |
+| Hosting | Vercel (cron) — Railway configs also included |
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
-pickleball_app/
-├── accounts/         # Custom user model, auth adapters, decorators
-├── bookings/         # Court booking system, availability, services
-├── courts/           # Court model and seeding
-├── openplay/         # Open play sessions and participant management
-├── inventory/        # Items, categories, stock, POS, rental POS
-├── transactions/     # Transaction records and history
-├── announcements/    # Announcement CRUD and banner display
-├── dashboard/        # Analytics, charts, and CSV exports
-├── core/             # Landing page and customer home
-├── config/           # Django settings and URL configuration
-├── static/           # CSS, JS, and image assets
-└── templates/        # All HTML templates
+pickleturf-app-vercel/
+├── accounts/       # Custom user model, roles, auth adapters
+├── bookings/       # Reservations, multi-slot availability, status cron
+├── courts/         # Court model and seed_courts command
+├── openplay/       # Open play sessions and participants
+├── inventory/      # Items, categories, stock, sales POS, rental POS
+├── transactions/   # Transaction records and history
+├── announcements/  # Announcement CRUD and site banner
+├── dashboard/      # Analytics, charts, CSV exports
+├── core/           # Landing page and customer home
+├── config/         # Django settings and URL configuration
+├── static/         # CSS, JS, images
+└── templates/      # All HTML templates
 ```
+
+Management commands: `seed_courts`, `update_booking_statuses`.
 
 ---
 
-## 🔧 Setup (Local Development)
+## Setup (Local)
+
+Copy `.env.example` to `.env` and fill in the values before running migrations.
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/pickleturf.git
-cd pickleturf
-
-# 2. Create and activate virtual environment
+git clone <repo-url> && cd pickleturf-app-vercel
 python -m venv venv
-source venv/bin/activate        # Mac/Linux
-venv\Scripts\activate           # Windows
-
-# 3. Install dependencies
+venv\Scripts\activate            # Windows  (source venv/bin/activate on Mac/Linux)
 pip install -r requirements.txt
 
-# 4. Set up environment variables
 cp .env.example .env
-# Edit .env with your local database and credentials
-
-# 5. Create the PostgreSQL database
-psql -U postgres -c "CREATE DATABASE pickleball_db;"
-
-# 6. Run migrations
 python manage.py migrate
-
-# 7. Seed initial courts
 python manage.py seed_courts
-
-# 8. Create a superuser
 python manage.py createsuperuser
-
-# 9. Run the development server
 python manage.py runserver
 ```
 
 ---
 
-## 🧪 Running Tests
+## Tests
 
 ```bash
-# Run all tests
-pytest -v
-
-# Run a specific app
-pytest bookings/tests.py -v
-
-# Run a specific test
-pytest bookings/tests.py::BookingServiceTests::test_duplicate_booking_raises_error
+pytest -v                                        # all tests
+pytest bookings/tests.py -v                      # one app
+pytest bookings/tests.py::BookingServiceTests -v # one class
 ```
+
+Config lives in `pytest.ini` (`DJANGO_SETTINGS_MODULE=config.settings`).
+
+---
+
+## Deployment (Vercel)
+
+- Set the required environment variables (see `.env.example`) in the Vercel project with `DEBUG=False`
+- `vercel.json` runs the cron `/bookings/cron/update-statuses/` daily to expire past reservations and sessions
+- Static files are served by WhiteNoise; uploaded media goes to Cloudinary
+- `railway.toml` / `nixpacks.toml` / `Procfile` remain for a Railway deploy (`gunicorn config.wsgi`)
 
 ---
 
 ## License
 
-This project is for private use. All rights reserved.
+Private use. All rights reserved.
