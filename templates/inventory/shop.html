@@ -66,9 +66,8 @@
                 <div class="d-flex justify-content-between align-items-start mb-1">
                     <h6 class="card-title mb-0 fw-bold">{{ item.name }}</h6>
                     <span class="badge
-                        {% if item.item_type == 'sale' %}bg-primary
-                        {% elif item.item_type == 'rent' %}bg-warning
-                        {% else %}bg-success{% endif %} ms-1">
+                        {% if item.item_type == 'sale' %}bg-success
+                        {% else %}bg-warning{% endif %} ms-1">
                         {{ item.get_item_type_display }}
                     </span>
                 </div>
@@ -87,19 +86,20 @@
 
                 {# Pricing #}
                 <div class="mt-auto">
-                    {% if item.sale_price %}
+                    {% if item.price %}
                     <div class="fw-semibold text-price">
-                        <i class="bi bi-cart3"></i> ₱{{ item.sale_price }}
-                    </div>
-                    {% endif %}
-                    {% if item.rent_price %}
-                    <div class="fw-semibold text-price">
-                        <i class="bi bi-clock"></i> ₱{{ item.rent_price }}/hr
+                        {% if item.item_type == 'sale' %}
+                        <i class="bi bi-cart3"></i>
+                        {% else %}
+                        <i class="bi bi-clock"></i>
+                        {% endif %}
+                        ₱{{ item.price }}
                     </div>
                     {% endif %}
                 </div>
             </div>
 
+            {% if item.stock == 0 or is_admin_or_staff %}
             <div class="card-footer bg-transparent border-0 pt-0">
                 {% if item.stock > 0 %}
                 <span class="badge bg-success-subtle text-success border border-success-subtle">
@@ -112,6 +112,7 @@
                 </span>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
     {% endfor %}

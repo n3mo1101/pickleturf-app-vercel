@@ -39,10 +39,10 @@ class InventoryItemForm(forms.ModelForm):
     def clean(self):
         cleaned   = super().clean()
         item_type = cleaned.get('item_type')
-        if item_type in (InventoryItem.ItemType.SALE, InventoryItem.ItemType.BOTH):
+        if item_type == InventoryItem.ItemType.SALE:
             if not cleaned.get('sale_price'):
                 self.add_error('sale_price', 'Sale price is required.')
-        if item_type in (InventoryItem.ItemType.RENT, InventoryItem.ItemType.BOTH):
+        if item_type == InventoryItem.ItemType.RENT:
             if not cleaned.get('rent_price'):
                 self.add_error('rent_price', 'Rent price is required.')
         return cleaned

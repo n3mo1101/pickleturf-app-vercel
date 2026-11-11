@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-11 — Inventory type and detail refinements
+
+### Changed
+- Inventory items are now either `For Sale` or `For Rent`; the `Sale & Rent` type is removed and existing records default to `For Sale`
+- Inventory list uses a single `Price` column and a green `For Sale` badge
+- `Process Sale` and `Process Rental` buttons no longer include the total
+- Sale detail actions moved to the page header and sale history uses the receipt icon
+- Returned rental badges are gray
+- Rental prices no longer show `/hr`
+- Sale item details show sale history instead of rental history
+- Item detail actions are in a 3-dots card menu
+- Shop hides in-stock counts from customers; the out-of-stock badge remains visible
+
+### Fixed
+- Customer names now display correctly in the item rental history
+- Sale history links use a theme-aware text color in dark mode
+
 ## 2026-11-10 — Open play auto-completion
 
 ### Changed

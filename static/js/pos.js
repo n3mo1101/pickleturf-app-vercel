@@ -55,9 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (grandTotal) grandTotal.textContent = fmtTotal;
         if (checkoutBtn) {
             checkoutBtn.disabled = !hasItems;
-            checkoutBtn.innerHTML = hasItems
-                ? `<i class="bi bi-check-circle"></i> ${isSale ? 'Process Sale' : 'Process Rental'} — ₱${fmtTotal}`
-                : `<i class="bi bi-check-circle"></i> ${isSale ? 'Process Sale' : 'Process Rental'}`;
+            checkoutBtn.innerHTML = `<i class="bi bi-check-circle"></i> ${isSale ? 'Process Sale' : 'Process Rental'}`;
         }
 
         // Mobile sticky bar

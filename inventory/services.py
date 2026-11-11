@@ -46,10 +46,7 @@ def process_sale(cart_items, created_by=None, notes=''):
         item = entry['item']
         qty  = entry['quantity']
 
-        if item.item_type not in (
-            InventoryItem.ItemType.SALE,
-            InventoryItem.ItemType.BOTH
-        ):
+        if item.item_type != InventoryItem.ItemType.SALE:
             raise ValidationError(f'"{item.name}" is not available for sale.')
 
         if not item.sale_price:
@@ -129,10 +126,7 @@ def process_rental(cart_items, renter_name, renter_contact='', handled_by=None):
         item = entry['item']
         qty  = entry['quantity']
 
-        if item.item_type not in (
-            InventoryItem.ItemType.RENT,
-            InventoryItem.ItemType.BOTH,
-        ):
+        if item.item_type != InventoryItem.ItemType.RENT:
             raise ValidationError(
                 f'"{item.name}" is not available for rent.'
             )

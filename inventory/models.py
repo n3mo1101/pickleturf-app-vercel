@@ -20,7 +20,6 @@ class InventoryItem(models.Model):
     class ItemType(models.TextChoices):
         SALE = 'sale', 'For Sale'
         RENT = 'rent', 'For Rent'
-        BOTH = 'both', 'Sale & Rent'
 
     category    = models.ForeignKey(
         Category, on_delete=models.SET_NULL,
@@ -36,7 +35,7 @@ class InventoryItem(models.Model):
     )
     rent_price  = models.DecimalField(
         max_digits=8, decimal_places=2, null=True, blank=True,
-        help_text='Price per hour'
+        help_text='Rental price'
     )
     stock       = models.PositiveIntegerField(default=0)
     image       = models.ImageField(upload_to='inventory/', blank=True, null=True)
@@ -55,16 +54,21 @@ class InventoryItem(models.Model):
         return f'{self.name} ({self.get_item_type_display()})'
 
     def clean(self):
-        if self.item_type in (self.ItemType.SALE, self.ItemType.BOTH):
-            if not self.sale_price:
-                raise ValidationError('Sale price is required for sale items.')
-        if self.item_type in (self.ItemType.RENT, self.ItemType.BOTH):
-            if not self.rent_price:
-                raise ValidationError('Rent price is required for rent items.')
+        if self.item_type == self.ItemType.SALE and not self.sale_price:
+            raise ValidationError('Sale price is required for sale items.')
+        if self.item_type == self.ItemType.RENT and not self.rent_price:
+            raise ValidationError('Rent price is required for rent items.')
 
     @property
     def in_stock(self):
         return self.stock > 0
+
+    @property
+    def price(self):
+        """The single price that applies to this item's type."""
+        if self.item_type == self.ItemType.SALE:
+            return self.sale_price
+        return self.rent_price
 
     def deduct_stock(self, qty=1):
         if self.stock < qty:

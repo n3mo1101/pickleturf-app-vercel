@@ -64,7 +64,7 @@
                     {% if r.status == 'active' %}
                     <span class="badge bg-warning">Active</span>
                     {% elif r.status == 'returned' %}
-                    <span class="badge bg-success">Returned</span>
+                    <span class="badge bg-secondary">Returned</span>
                     {% else %}
                     <span class="badge bg-danger">Overdue</span>
                     {% endif %}
@@ -89,7 +89,7 @@
                                       data-pt-confirm-class="btn-primary">
                                     {% csrf_token %}
                                     <button type="submit" class="dropdown-item">
-                                        <i class="bi bi-arrow-return-left"></i> Mark returned
+                                        <i class="bi bi-check-circle"></i> Mark returned
                                     </button>
                                 </form>
                             </li>

@@ -39,11 +39,17 @@ class InventoryStockTests(TestCase):
             rent_price=100,
             stock=5,
         )
-        self.both_item = InventoryItem.objects.create(
+        self.sale_item_2 = InventoryItem.objects.create(
             name='Starter Paddle',
             category=self.category,
-            item_type=InventoryItem.ItemType.BOTH,
+            item_type=InventoryItem.ItemType.SALE,
             sale_price=1200,
+            stock=8,
+        )
+        self.rent_item_2 = InventoryItem.objects.create(
+            name='Training Ball',
+            category=self.category,
+            item_type=InventoryItem.ItemType.RENT,
             rent_price=80,
             stock=8,
         )
@@ -89,7 +95,7 @@ class InventoryStockTests(TestCase):
         sale = process_sale(
             cart_items=[
                 {'item': self.sale_item, 'quantity': 2},  # 2500 × 2 = 5000
-                {'item': self.both_item, 'quantity': 1},  # 1200 × 1 = 1200
+                {'item': self.sale_item_2, 'quantity': 1},  # 1200 × 1 = 1200
             ],
             created_by=self.staff,
         )
@@ -161,7 +167,7 @@ class InventoryStockTests(TestCase):
         records, total = process_rental(
             cart_items=[
                 {'item': self.rent_item, 'quantity': 2},  # 100 × 2 = 200
-                {'item': self.both_item, 'quantity': 1},  # 80  × 1 = 80
+                {'item': self.rent_item_2, 'quantity': 1},  # 80  × 1 = 80
             ],
             renter_name='Walk In',
         )
@@ -337,3 +343,54 @@ class InventoryModalViewTests(TestCase):
             response, 'inventory/_category_modal.html'
         )
         self.assertContains(response, 'already exists')
+
+
+class InventoryItemDetailViewTests(TestCase):
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email='detail@test.com',
+            password='testpass123',
+            first_name='Detail',
+            last_name='Staff',
+            role='staff',
+            is_staff=True,
+        )
+        self.category = Category.objects.create(name='Equipment')
+        self.sale_item = InventoryItem.objects.create(
+            name='Paddle',
+            category=self.category,
+            item_type=InventoryItem.ItemType.SALE,
+            sale_price=500,
+            stock=10,
+        )
+        self.rent_item = InventoryItem.objects.create(
+            name='Shoes',
+            category=self.category,
+            item_type=InventoryItem.ItemType.RENT,
+            rent_price=100,
+            stock=5,
+        )
+        self.client.force_login(self.staff)
+
+    def test_sale_item_detail_shows_sale_history(self):
+        process_sale(
+            cart_items=[{'item': self.sale_item, 'quantity': 1}],
+            created_by=self.staff,
+        )
+        response = self.client.get(
+            reverse('inventory:admin_detail', args=[self.sale_item.pk])
+        )
+        self.assertContains(response, 'Sale history')
+        self.assertNotContains(response, 'Recent rental history')
+
+    def test_rent_item_detail_shows_renter_name(self):
+        process_rental(
+            cart_items=[{'item': self.rent_item, 'quantity': 1}],
+            renter_name='Alice Renter',
+        )
+        response = self.client.get(
+            reverse('inventory:admin_detail', args=[self.rent_item.pk])
+        )
+        self.assertContains(response, 'Recent rental history')
+        self.assertContains(response, 'Alice Renter')

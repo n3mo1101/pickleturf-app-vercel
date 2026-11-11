@@ -11,6 +11,32 @@
 <div class="row g-4">
     <div class="col-md-5">
         <div class="card shadow-sm border-0">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Item details</span>
+                <div class="dropdown">
+                    <button class="btn btn-icon" type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            aria-label="Actions for {{ item.name }}">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item"
+                               href="{% url 'inventory:admin_edit' item.pk %}">
+                                <i class="bi bi-pencil"></i> Edit
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               href="{% url 'inventory:admin_stock' item.pk %}?next={{ request.get_full_path|urlencode }}"
+                               data-pt-form-modal>
+                                <i class="bi bi-boxes"></i> Adjust stock
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             {% if item.image %}
             <img src="{{ item.image.url }}" class="card-img-top"
                  style="max-height:250px;object-fit:cover;">
@@ -24,10 +50,8 @@
                         <td>{{ item.category.name|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Type</td>
                         <td>{{ item.get_item_type_display }}</td></tr>
-                    <tr><td class="text-muted">Sale Price</td>
-                        <td>{% if item.sale_price %}₱{{ item.sale_price }}{% else %}—{% endif %}</td></tr>
-                    <tr><td class="text-muted">Rent Price</td>
-                        <td>{% if item.rent_price %}₱{{ item.rent_price }}/hr{% else %}—{% endif %}</td></tr>
+                    <tr><td class="text-muted">Price</td>
+                        <td>{% if item.price %}₱{{ item.price }}{% else %}—{% endif %}</td></tr>
                     <tr><td class="text-muted">Stock</td>
                         <td class="fw-bold
                             {% if item.stock == 0 %}text-danger
@@ -43,18 +67,6 @@
                             {% endif %}
                         </td></tr>
                 </table>
-
-                <div class="d-flex gap-2 flex-wrap mt-2">
-                    <a href="{% url 'inventory:admin_edit' item.pk %}"
-                       class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-pencil"></i> Edit
-                    </a>
-                    <a href="{% url 'inventory:admin_stock' item.pk %}?next={{ request.get_full_path|urlencode }}"
-                       class="btn btn-outline-warning btn-sm"
-                       data-pt-form-modal>
-                        <i class="bi bi-boxes"></i> Adjust Stock
-                    </a>
-                </div>
             </div>
         </div>
     </div>
@@ -77,7 +89,7 @@
                         <tr>
                             <td>{{ r.renter_name }}</td>
                             <td>{{ r.rented_at|date:"M d, g:i A" }}</td>
-                            <td>{{ r.quantity }}h</td>
+                            <td>{{ r.quantity }}</td>
                             <td>₱{{ r.total_cost }}</td>
                             <td>
                                 <form method="post"
@@ -109,6 +121,49 @@
         </div>
         {% endif %}
 
+        {% if item.item_type == 'sale' %}
+        {# Sale History #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-header fw-semibold">
+                Sale history
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0 table-card-mobile">
+                    <thead>
+                        <tr>
+                            <th>Sale</th>
+                            <th>Date</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for si in recent_sales %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'inventory:admin_sale_detail' si.sale.pk %}"
+                                   class="text-reset fw-semibold">
+                                    #{{ si.sale.pk }}
+                                </a>
+                            </td>
+                            <td>{{ si.sale.created_at|date:"M d, Y" }}</td>
+                            <td class="text-center">{{ si.quantity }}</td>
+                            <td class="text-end">₱{{ si.unit_price }}</td>
+                            <td class="text-end fw-semibold">₱{{ si.subtotal }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">
+                                No sale history.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
         {# Recent Rental History #}
         <div class="card border-0 shadow-sm">
             <div class="card-header fw-semibold">
@@ -125,7 +180,7 @@
                     <tbody>
                         {% for r in recent_rentals %}
                         <tr>
-                            <td>{{ r.user.renter_name }}</td>
+                            <td>{{ r.renter_name }}</td>
                             <td>{{ r.rented_at|date:"M d" }}</td>
                             <td>
                                 {{ r.returned_at|date:"M d"|default:"—" }}
@@ -135,7 +190,7 @@
                                 {% if r.status == 'active' %}
                                 <span class="badge bg-warning">Active</span>
                                 {% elif r.status == 'returned' %}
-                                <span class="badge bg-success">Returned</span>
+                                <span class="badge bg-secondary">Returned</span>
                                 {% else %}
                                 <span class="badge bg-danger">Overdue</span>
                                 {% endif %}
@@ -152,6 +207,7 @@
                 </table>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

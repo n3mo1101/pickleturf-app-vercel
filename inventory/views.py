@@ -15,7 +15,7 @@ from .forms import (
     CategoryForm, InventoryItemForm,
     RentalCreateForm, StockAdjustForm,
 )
-from .models import Category, InventoryItem, RentalRecord, Sale
+from .models import Category, InventoryItem, RentalRecord, Sale, SaleItem
 from . import services
 
 
@@ -61,7 +61,7 @@ def admin_pos_view(request):
     """
     items = InventoryItem.objects.filter(
         is_active=True,
-        item_type__in=[InventoryItem.ItemType.SALE, InventoryItem.ItemType.BOTH],
+        item_type=InventoryItem.ItemType.SALE,
     ).select_related('category').order_by('category__name', 'name')
 
     category_filter = request.GET.get('category')
@@ -80,7 +80,7 @@ def admin_pos_view(request):
         # Collect non-zero quantities from POST
         for item in InventoryItem.objects.filter(
             is_active=True,
-            item_type__in=[InventoryItem.ItemType.SALE, InventoryItem.ItemType.BOTH]
+            item_type=InventoryItem.ItemType.SALE,
         ):
             qty_str = request.POST.get(f'qty_{item.pk}', '').strip()
             if not qty_str:
@@ -234,11 +234,17 @@ def admin_item_detail_view(request, pk):
     recent_rentals = RentalRecord.objects.filter(
         item=item
     ).order_by('-rented_at')[:10]
+    recent_sales = []
+    if item.item_type == InventoryItem.ItemType.SALE:
+        recent_sales = SaleItem.objects.filter(
+            item=item
+        ).select_related('sale').order_by('-sale__created_at')[:10]
 
     return render(request, 'inventory/admin_item_detail.html', {
         'item':           item,
         'active_rentals': active_rentals,
         'recent_rentals': recent_rentals,
+        'recent_sales':   recent_sales,
     })
 
 
@@ -296,10 +302,7 @@ def admin_rental_pos_view(request):
     """
     items = InventoryItem.objects.filter(
         is_active=True,
-        item_type__in=[
-            InventoryItem.ItemType.RENT,
-            InventoryItem.ItemType.BOTH,
-        ],
+        item_type=InventoryItem.ItemType.RENT,
     ).select_related('category').order_by('category__name', 'name')
 
     category_filter = request.GET.get('category')
@@ -318,10 +321,7 @@ def admin_rental_pos_view(request):
 
         for item in InventoryItem.objects.filter(
             is_active=True,
-            item_type__in=[
-                InventoryItem.ItemType.RENT,
-                InventoryItem.ItemType.BOTH,
-            ]
+            item_type=InventoryItem.ItemType.RENT,
         ):
             qty_str = request.POST.get(f'qty_{item.pk}', '').strip()
             if not qty_str:

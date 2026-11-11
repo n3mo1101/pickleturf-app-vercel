@@ -90,8 +90,7 @@
                 <th>Item</th>
                 <th>Category</th>
                 <th>Type</th>
-                <th>Sale Price</th>
-                <th>Rent Price</th>
+                <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
                 <th class="th-actions"><span class="visually-hidden">Actions</span></th>
@@ -119,13 +118,11 @@
                 <td data-label="Type">
                     <span class="badge
                         {% if item.item_type == 'sale' %}bg-primary
-                        {% elif item.item_type == 'rent' %}bg-warning
-                        {% else %}bg-success{% endif %}">
+                        {% else %}bg-warning{% endif %}">
                         {{ item.get_item_type_display }}
                     </span>
                 </td>
-                <td data-label="Sale Price">{% if item.sale_price %}₱{{ item.sale_price }}{% else %}—{% endif %}</td>
-                <td data-label="Rent Price">{% if item.rent_price %}₱{{ item.rent_price }}{% else %}—{% endif %}</td>
+                <td data-label="Price">{% if item.price %}₱{{ item.price }}{% else %}—{% endif %}</td>
                 <td data-label="Stock">
                     <span class="fw-bold
                         {% if item.stock == 0 %}text-danger
@@ -189,7 +186,7 @@
             </tr>
             {% empty %}
             <tr class="empty-state">
-                <td colspan="8">
+                <td colspan="7">
                     <i class="bi bi-box-seam"></i>
                     No items found.
                 </td>
