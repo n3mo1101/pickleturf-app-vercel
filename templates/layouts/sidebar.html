@@ -1,4 +1,5 @@
 {% load static %}
+{% load images %}
 <aside class="pt-sidebar" id="ptSidebar">
 
     {# ── Brand ── #}
@@ -11,7 +12,9 @@
     <div class="pt-sidebar-user">
         <div class="pt-user-avatar">
             {% if user.avatar %}
-                <img src="{{ user.avatar.url }}" alt="{{ user.full_name }}">
+                <img src="{% image_url user.avatar 'avatar' %}"
+                     srcset="{% image_srcset user.avatar 'avatar' %}"
+                     width="96" height="96" alt="{{ user.full_name }}">
             {% else %}
                 {{ user.first_name|first|upper }}
             {% endif %}

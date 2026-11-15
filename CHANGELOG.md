@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-11-16 — Performance: request path, images, caching
+
+### Added
+- `core/templatetags/images.py` with `image_url`/`image_srcset` presets (`thumb`, `pos`, `card`, `detail`, `avatar`) for transformed Cloudinary delivery
+- `core/storage.py` uploads a bounded master (`w_2000,c_limit`, `quality auto:good`) instead of the raw original
+- `backfill_media` management command to re-upload existing images in place
+- Browser-side image downscaling to 2000 px before submit
+- Server-side image validation (5 MB limit, `image/*`, verified decode) on item and avatar forms
+- Shared `includes/pagination.html` partial and `core.utils.paginate()` helper
+- Query-count regression tests for dashboard, shop, my bookings, and open play admin
+- Opt-in `ServerTimingMiddleware` (`SERVER_TIMING=True`) reporting DB time and query count
+
+### Changed
+- Booking and open play status refresh now runs as bulk SQL instead of per-row saves
+- `Booking.save()` only runs `full_clean()` on create
+- `date.today()` replaced with `timezone.localdate()` across views and the booking form; the date input `min` is set per request
+- Revenue aggregates use `created_at` range bounds and a single filtered `aggregate()`
+- Dashboard merges today/month/previous-month queries and annotates upcoming sessions with participant counts
+- `spots_remaining` reads the annotated `approved_count`, removing per-row counts
+- `slot_count` uses the prefetch cache; `my_bookings` loads `transaction` up front
+- Open play, inventory, booking, and sale lists are paginated (25–50 rows)
+- Shop, POS, inventory, detail, sidebar, and profile images use right-sized variants with explicit dimensions and lazy loading
+- Service worker no longer caches HTML pages and only pre-caches static assets
+- `/static/` is cached for one day with `stale-while-revalidate`
+
+### Fixed
+- Waived transactions for missed bookings were never written off because the queryset was re-evaluated after the status update
+- Bookings and open play sessions with `end_time == now` were treated as still upcoming
+- Joining or approving participants on a session past its end time is now rejected
+- Cached personalised pages could be shown to another user after logout on a shared device
+- Dashboard "today" figures could show the previous UTC day between 00:00 and 07:59 SGT
+
+### Removed
+- `/dashboard/`, `/transactions/`, and `/bookings/my/` from the service worker cache list
+
 ## 2026-11-11 — Inventory type and detail refinements
 
 ### Changed

@@ -1,5 +1,6 @@
 from django import forms
 from datetime import date
+from django.utils import timezone
 from courts.models import Court
 from .services import get_time_slots, get_availability
 
@@ -21,7 +22,6 @@ class BookingForm(forms.Form):
         widget=forms.DateInput(attrs={
             'class': 'form-control',
             'type': 'date',
-            'min': date.today().isoformat(),
             'id': 'id_date',
         }),
     )
@@ -41,6 +41,8 @@ class BookingForm(forms.Form):
 
     def __init__(self, *args, available_slots=None, payments_enabled=True, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set per-request so the input never carries a stale import-time date.
+        self.fields['date'].widget.attrs['min'] = timezone.localdate().isoformat()
         if available_slots:
             self.fields['time_slots'].choices = available_slots
         else:
@@ -53,7 +55,7 @@ class BookingForm(forms.Form):
 
     def clean_date(self):
         selected = self.cleaned_data['date']
-        if selected < date.today():
+        if selected < timezone.localdate():
             raise forms.ValidationError('Please select today or a future date.')
         return selected
 

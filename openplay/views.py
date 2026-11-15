@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from datetime import date
 
 from accounts.decorators import admin_or_staff_required
+from core.utils import paginate
 from .forms import AddParticipantForm, OpenPlaySessionForm
 from .models import OpenPlayParticipant, OpenPlaySession
 from . import services
@@ -123,16 +124,11 @@ def leave_session_view(request, pk):
 @admin_or_staff_required
 def admin_session_list_view(request):
     """Admin sees all sessions with participant counts."""
-    from django.db.models import Count, Q
-
     services.auto_update_session_statuses()
 
-    sessions = OpenPlaySession.objects.annotate(
-        pending_count=Count(
-            'participants',
-            filter=Q(participants__status=OpenPlayParticipant.Status.PENDING)
-        )
-    ).prefetch_related('participants').order_by('-date', '-start_time')
+    sessions = services.annotate_participant_counts(
+        OpenPlaySession.objects.all()
+    ).order_by('-date', '-start_time')
 
     # Filter by status and/or date
     status_filter = request.GET.get('status')
@@ -145,8 +141,11 @@ def admin_session_list_view(request):
         except ValueError:
             date_filter = ''
 
+    page_obj, query_string = paginate(request, sessions, 25)
+
     return render(request, 'openplay/admin_session_list.html', {
-        'sessions':       sessions,
+        'sessions':       page_obj,
+        'query_string':   query_string,
         'status_choices': OpenPlaySession.Status.choices,
         'status_filter':  status_filter,
         'date_filter':    date_filter,

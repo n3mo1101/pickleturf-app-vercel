@@ -1,4 +1,5 @@
 {% extends 'layouts/base.html' %}
+{% load images %}
 {% block title %}{{ item.name }}{% endblock %}
 
 {% block content %}
@@ -38,8 +39,10 @@
                 </div>
             </div>
             {% if item.image %}
-            <img src="{{ item.image.url }}" class="card-img-top"
-                 style="max-height:250px;object-fit:cover;">
+            <img src="{% image_url item.image 'detail' %}"
+                 class="card-img-top" width="1200" height="800"
+                 decoding="async"
+                 style="aspect-ratio:2/1;max-height:250px;object-fit:cover;">
             {% endif %}
             <div class="card-body">
                 <h5 class="fw-bold">{{ item.name }}</h5>

@@ -1,5 +1,5 @@
 import csv
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncDate, TruncMonth
@@ -33,17 +33,31 @@ def _revenue_queryset():
     )
 
 
+def _local_day_start(day):
+    """Aware datetime for 00:00 local time on ``day``.
+
+    Range filters on the raw ``created_at`` column keep the index usable;
+    ``created_at__date`` applies a timezone conversion per row instead.
+    """
+    return datetime.combine(
+        day, time.min, tzinfo=timezone.get_current_timezone()
+    )
+
+
 def _daily_revenue_last_30():
     """
     Returns list of (date_str, total) for last 30 days.
     Fills in 0 for days with no transactions.
     """
-    today   = date.today()
+    today   = timezone.localdate()
     start   = today - timedelta(days=29)
 
     rows = (
         _revenue_queryset()
-        .filter(created_at__date__gte=start)
+        .filter(
+            created_at__gte=_local_day_start(start),
+            created_at__lt=_local_day_start(today + timedelta(days=1)),
+        )
         .annotate(day=TruncDate('created_at'))
         .values('day')
         .annotate(total=Sum('amount'))
@@ -64,11 +78,14 @@ def _daily_revenue_last_30():
 
 def _monthly_revenue_this_year():
     """Returns list of 12 monthly totals for the current year."""
-    year = date.today().year
+    year = timezone.localdate().year
 
     rows = (
         _revenue_queryset()
-        .filter(created_at__year=year)
+        .filter(
+            created_at__gte=_local_day_start(date(year, 1, 1)),
+            created_at__lt=_local_day_start(date(year + 1, 1, 1)),
+        )
         .annotate(month=TruncMonth('created_at'))
         .values('month')
         .annotate(total=Sum('amount'))
@@ -118,58 +135,71 @@ def _format_duration(delta):
 def index(request):
     # Update booking and open play statuses before loading dashboard data
     from bookings.services import auto_update_booking_statuses
-    from openplay.services import auto_update_session_statuses
+    from openplay.services import (
+        annotate_participant_counts,
+        auto_update_session_statuses,
+    )
 
     auto_update_booking_statuses()
     auto_update_session_statuses()
 
-    today = date.today()
+    today = timezone.localdate()
     now   = timezone.now()
+    today_start    = _local_day_start(today)
+    tomorrow_start = _local_day_start(today + timedelta(days=1))
 
     # ── Summary Cards ──────────────────────────────────────────────
-    today_qs = _revenue_queryset().filter(created_at__date=today)
-
-    today_revenue = today_qs.aggregate(total=Sum('amount'))['total'] or 0
-
-    split_bookings = (
-        today_qs
-        .filter(tx_type__in=[
-            Transaction.TxType.BOOKING,
-            Transaction.TxType.OPENPLAY,
-        ])
-        .aggregate(total=Sum('amount'))['total'] or 0
+    # One aggregate for all three "today" figures instead of three queries.
+    today_totals = (
+        _revenue_queryset()
+        .filter(created_at__gte=today_start, created_at__lt=tomorrow_start)
+        .aggregate(
+            revenue=Sum('amount'),
+            bookings=Sum('amount', filter=Q(tx_type__in=[
+                Transaction.TxType.BOOKING,
+                Transaction.TxType.OPENPLAY,
+            ])),
+            products=Sum('amount', filter=Q(tx_type__in=[
+                Transaction.TxType.SALE,
+                Transaction.TxType.RENTAL,
+            ])),
+        )
     )
+    today_revenue  = today_totals['revenue'] or 0
+    split_bookings = today_totals['bookings'] or 0
+    split_products = today_totals['products'] or 0
 
-    split_products = (
-        today_qs
-        .filter(tx_type__in=[
-            Transaction.TxType.SALE,
-            Transaction.TxType.RENTAL,
-        ])
-        .aggregate(total=Sum('amount'))['total'] or 0
+    last_tx = (
+        _revenue_queryset()
+        .filter(created_at__gte=today_start, created_at__lt=tomorrow_start)
+        .order_by('-created_at')
+        .first()
     )
-
-    last_tx = today_qs.order_by('-created_at').first()
     last_tx_amount = last_tx.amount if last_tx else None
     last_tx_label = _TX_TYPE_SHORT.get(last_tx.tx_type) if last_tx else None
 
-    month_revenue = (
+    # This month and last month in one query.
+    first_of_month = today.replace(day=1)
+    month_start  = _local_day_start(first_of_month)
+    next_month_start = _local_day_start(
+        (first_of_month + timedelta(days=32)).replace(day=1)
+    )
+    prev_month_end = first_of_month - timedelta(days=1)
+    prev_month_start = _local_day_start(prev_month_end.replace(day=1))
+
+    month_totals = (
         _revenue_queryset()
         .filter(
-            created_at__year=today.year,
-            created_at__month=today.month
+            created_at__gte=prev_month_start,
+            created_at__lt=next_month_start,
         )
-        .aggregate(total=Sum('amount'))['total'] or 0
+        .aggregate(
+            current=Sum('amount', filter=Q(created_at__gte=month_start)),
+            previous=Sum('amount', filter=Q(created_at__lt=month_start)),
+        )
     )
-
-    first_of_month = today.replace(day=1)
-    prev_month_end = first_of_month - timedelta(days=1)
-    prev_month_start = prev_month_end.replace(day=1)
-    prev_month_revenue = (
-        _revenue_queryset()
-        .filter(created_at__date__range=(prev_month_start, prev_month_end))
-        .aggregate(total=Sum('amount'))['total'] or 0
-    )
+    month_revenue = month_totals['current'] or 0
+    prev_month_revenue = month_totals['previous'] or 0
 
     month_change_pct = None
     month_change_up = True
@@ -243,13 +273,14 @@ def index(request):
     )
 
     upcoming_sessions = (
-        OpenPlaySession.objects
-        .filter(
-            date__gte=today,
-            status__in=[
-                OpenPlaySession.Status.OPEN,
-                OpenPlaySession.Status.FULL,
-            ]
+        annotate_participant_counts(
+            OpenPlaySession.objects.filter(
+                date__gte=today,
+                status__in=[
+                    OpenPlaySession.Status.OPEN,
+                    OpenPlaySession.Status.FULL,
+                ]
+            )
         )
         .order_by('date', 'start_time')[:3]
     )
@@ -320,11 +351,14 @@ def _export_filename(kind, start, end):
     return f'{_EXPORT_FILENAMES[kind]}_{suffix}.csv'
 
 
-def _filter_by_range(queryset, field, start, end):
+def _filter_by_created_date(queryset, start, end):
+    """Created-at range filter using raw column bounds (index friendly)."""
     if start:
-        queryset = queryset.filter(**{f'{field}__gte': start})
+        queryset = queryset.filter(created_at__gte=_local_day_start(start))
     if end:
-        queryset = queryset.filter(**{f'{field}__lte': end})
+        queryset = queryset.filter(
+            created_at__lt=_local_day_start(end + timedelta(days=1))
+        )
     return queryset
 
 
@@ -348,12 +382,12 @@ def export_csv(request):
     writer = csv.writer(response)
 
     if kind == 'transactions':
-        rows = _filter_by_range(
+        rows = _filter_by_created_date(
             Transaction.objects
             .select_related('user', 'created_by', 'booking')
             .prefetch_related('booking__slots')
             .order_by('-created_at'),
-            'created_at__date', start, end,
+            start, end,
         )
         writer.writerow([
             'ID', 'Date', 'Type', 'Amount',
@@ -379,9 +413,9 @@ def export_csv(request):
 
 
     elif kind == 'daily':
-        rows = _filter_by_range(
+        rows = _filter_by_created_date(
             _revenue_queryset(),
-            'created_at__date', start, end,
+            start, end,
         )
         writer.writerow(['Date', 'Total'])
         for r in (
@@ -395,9 +429,9 @@ def export_csv(request):
 
 
     else:  # monthly
-        rows = _filter_by_range(
+        rows = _filter_by_created_date(
             _revenue_queryset(),
-            'created_at__date', start, end,
+            start, end,
         )
         writer.writerow(['Month', 'Total'])
         for r in (

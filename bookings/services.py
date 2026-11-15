@@ -3,6 +3,7 @@ from datetime import date, time, datetime, timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from courts.models import Court
@@ -369,7 +370,7 @@ def get_available_slots_for_court(court, selected_date):
 def auto_update_booking_statuses():
     """
     Keep booking statuses current. Called by the daily Vercel Cron endpoint
-    (`/bookings/cron/update-statuses/`) and the `update_booking_statuses`
+    (`/bookings/cron/update-statuses/`), the `update_booking_statuses`
     management command, and opportunistically on page loads.
 
     Rules (reserved bookings whose last slot has passed):
@@ -377,46 +378,56 @@ def auto_update_booking_statuses():
       - transaction not paid (or missing) → MISSED, unpaid charge waived
 
     Payment is never forced to PAID here — only actual payment does that.
+
+    Runs as a handful of bulk statements rather than a per-booking loop, so
+    it is cheap enough to keep on page loads (a few queries, all served from
+    the `(status, date)` index).
     """
     from transactions.models import Transaction
 
     now = timezone.now()
+    local = timezone.localtime(now)
 
-    stale = (
-        Booking.objects
-        .filter(status=Booking.Status.RESERVED)
-        .select_related('court')
-        .prefetch_related('slots')
+    past = Booking.objects.filter(
+        status=Booking.Status.RESERVED
+    ).filter(
+        Q(date__lt=local.date())
+        | Q(date=local.date(), end_time__lte=local.time())
     )
 
-    for booking in stale:
-        if not booking.end_time:
-            continue
+    # Materialise both lists before mutating statuses: the `missed` queryset
+    # filters on status=RESERVED and would match nothing once the update ran.
+    paid_pks = list(
+        past.filter(
+            transaction__payment_status=Transaction.PaymentStatus.PAID
+        ).values_list('pk', flat=True)
+    )
+    missed_pks = list(
+        past.exclude(
+            transaction__payment_status=Transaction.PaymentStatus.PAID
+        ).values_list('pk', flat=True)
+    )
 
-        end_dt = datetime.combine(booking.date, booking.end_time)
-        end_dt = timezone.make_aware(end_dt)
+    if paid_pks:
+        Booking.objects.filter(pk__in=paid_pks).update(
+            status=Booking.Status.COMPLETED,
+            updated_at=now,
+        )
 
-        if end_dt > now:
-            continue   # still in the future
-
-        try:
-            tx = booking.transaction
-        except Transaction.DoesNotExist:
-            tx = None
-
-        if tx and tx.payment_status == Transaction.PaymentStatus.PAID:
-            booking.status = Booking.Status.COMPLETED
-            booking.save(update_fields=['status', 'updated_at'])
-            continue
-
-        # No payment collected — the slot was missed. Write off the charge
-        # so it never counts as revenue.
-        booking.status = Booking.Status.MISSED
-        booking.save(update_fields=['status', 'updated_at'])
-
-        if tx and tx.payment_status == Transaction.PaymentStatus.PENDING:
-            tx.payment_status = Transaction.PaymentStatus.WAIVED
-            tx.save(update_fields=['payment_status', 'updated_at'])
+    if missed_pks:
+        Booking.objects.filter(pk__in=missed_pks).update(
+            status=Booking.Status.MISSED,
+            updated_at=now,
+        )
+        # No payment collected — write off the charge so it never counts as
+        # revenue.
+        Transaction.objects.filter(
+            booking_id__in=missed_pks,
+            payment_status=Transaction.PaymentStatus.PENDING,
+        ).update(
+            payment_status=Transaction.PaymentStatus.WAIVED,
+            updated_at=now,
+        )
 
 
 # ── Pricing Calculation ───────────────────────────────────────────────────────

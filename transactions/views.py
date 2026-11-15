@@ -1,11 +1,12 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 import logging
 import json
@@ -42,27 +43,40 @@ def transaction_list_view(request):
         transactions = transactions.filter(payment_status=status_filter)
     if date_from:
         try:
-            transactions = transactions.filter(
-                created_at__date__gte=date_from
-            )
+            start = date.fromisoformat(date_from)
         except ValueError:
             pass
+        else:
+            transactions = transactions.filter(
+                created_at__gte=datetime.combine(
+                    start, time.min,
+                    tzinfo=timezone.get_current_timezone(),
+                )
+            )
     if date_to:
         try:
-            transactions = transactions.filter(
-                created_at__date__lte=date_to
-            )
+            end = date.fromisoformat(date_to)
         except ValueError:
             pass
+        else:
+            transactions = transactions.filter(
+                created_at__lt=datetime.combine(
+                    end + timedelta(days=1), time.min,
+                    tzinfo=timezone.get_current_timezone(),
+                )
+            )
 
     # ── Running totals of filtered results ────────────────────────
-    # Revenue only counts paid rows; the count covers every filtered row.
-    paid_total = (
-        transactions
-        .filter(payment_status=Transaction.PaymentStatus.PAID)
-        .aggregate(total=Sum('amount'))['total'] or 0
+    # One aggregate: revenue counts paid rows, the count covers all rows.
+    totals = transactions.aggregate(
+        paid_total=Sum(
+            'amount',
+            filter=Q(payment_status=Transaction.PaymentStatus.PAID),
+        ),
+        total_count=Count('id'),
     )
-    total_count = transactions.aggregate(count=Count('id'))['count'] or 0
+    paid_total  = totals['paid_total'] or 0
+    total_count = totals['total_count'] or 0
 
     # ── Pagination ─────────────────────────────────────────────────
     paginator    = Paginator(transactions, 20)
