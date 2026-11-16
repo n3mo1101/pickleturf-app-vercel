@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import admin_or_staff_required
-from core.utils import is_modal_request, safe_next_url
+from core.utils import is_modal_request, paginate, safe_next_url
 from .forms import (
     CategoryForm, InventoryItemForm,
     RentalCreateForm, StockAdjustForm,
@@ -41,8 +41,11 @@ def shop_view(request):
             Q(description__icontains=search_query)
         )
 
+    page_obj, query_string = paginate(request, items, 24)
+
     return render(request, 'inventory/shop.html', {
-        'items':           items,
+        'items':           page_obj,
+        'query_string':    query_string,
         'categories':      Category.objects.all().order_by('name'),
         'category_filter': category_filter,
         'type_filter':     type_filter,
@@ -133,7 +136,12 @@ def admin_sale_list_view(request):
         'items__item'
     ).select_related('created_by').order_by('-created_at')
 
-    return render(request, 'inventory/admin_sale_list.html', {'sales': sales})
+    page_obj, query_string = paginate(request, sales, 25)
+
+    return render(request, 'inventory/admin_sale_list.html', {
+        'sales':        page_obj,
+        'query_string': query_string,
+    })
 
 
 @admin_or_staff_required
@@ -173,8 +181,11 @@ def admin_item_list_view(request):
             Q(description__icontains=search_query)
         )
 
+    page_obj, query_string = paginate(request, items, 50)
+
     return render(request, 'inventory/admin_item_list.html', {
-        'items':           items,
+        'items':           page_obj,
+        'query_string':    query_string,
         'categories':      Category.objects.all(),
         'category_filter': category_filter,
         'type_filter':     type_filter,
@@ -392,8 +403,11 @@ def admin_rental_list_view(request):
             Q(renter_contact__icontains=search_query)
         )
 
+    page_obj, query_string = paginate(request, rentals, 50)
+
     return render(request, 'inventory/admin_rental_list.html', {
-        'rentals':        rentals,
+        'rentals':        page_obj,
+        'query_string':   query_string,
         'status_choices': RentalRecord.Status.choices,
         'status_filter':  status_filter,
         'search_query':   search_query,

@@ -38,9 +38,14 @@ class OpenPlaySession(models.Model):
 
     @property
     def spots_remaining(self):
-        return self.capacity - self.participants.filter(
-            status=OpenPlayParticipant.Status.APPROVED
-        ).count()
+        # Lists annotate `approved_count` so this stays a single query; the
+        # fallback covers detail pages and unsaved/standalone instances.
+        approved = getattr(self, 'approved_count', None)
+        if approved is None:
+            approved = self.participants.filter(
+                status=OpenPlayParticipant.Status.APPROVED
+            ).count()
+        return self.capacity - approved
 
     @property
     def is_full(self):

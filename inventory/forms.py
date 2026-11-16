@@ -1,4 +1,5 @@
 from django import forms
+from core.validators import validate_image_upload
 from .models import Category, InventoryItem, RentalRecord
 
 
@@ -35,6 +36,9 @@ class InventoryItemForm(forms.ModelForm):
             'stock':       forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
             'is_active':   forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def clean_image(self):
+        return validate_image_upload(self.cleaned_data.get('image'))
 
     def clean(self):
         cleaned   = super().clean()

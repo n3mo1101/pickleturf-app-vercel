@@ -75,6 +75,10 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
+# Opt-in request instrumentation (see core/middleware.py).
+if os.environ.get('SERVER_TIMING') == 'True':
+    MIDDLEWARE.insert(0, 'core.middleware.ServerTimingMiddleware')
+
 ROOT_URLCONF = 'config.urls'
 
 # ─── TEMPLATES ────────────────────────────────────────────────────────────────
@@ -225,7 +229,7 @@ CLOUDINARY_STORAGE = {
 # Only use Cloudinary in production
 STORAGES = {
     "default": {
-        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage" if not DEBUG
+        "BACKEND": "core.storage.OptimisedMediaCloudinaryStorage" if not DEBUG
         else "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {

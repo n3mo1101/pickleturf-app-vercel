@@ -111,4 +111,6 @@
         </tbody>
     </table>
 </div>
+
+{% include 'includes/pagination.html' with page_obj=rentals query_string=query_string %}
 {% endblock %}

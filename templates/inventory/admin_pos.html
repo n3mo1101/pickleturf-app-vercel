@@ -1,5 +1,6 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
+{% load images %}
 {% block title %}Point of sale{% endblock %}
 
 {% block content %}
@@ -55,7 +56,9 @@
                             data-stock="{{ item.stock }}">
 
                             {% if item.image %}
-                            <img src="{{ item.image.url }}" class="card-img-top"
+                            <img src="{% image_url item.image 'pos' %}"
+                                class="card-img-top" width="400" height="220"
+                                loading="lazy" decoding="async"
                                 style="height:110px;object-fit:cover;">
                             {% else %}
                             <div class="bg-light d-flex align-items-center

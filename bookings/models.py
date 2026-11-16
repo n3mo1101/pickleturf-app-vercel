@@ -89,7 +89,7 @@ class Booking(models.Model):
         indexes = [
             models.Index(fields=['date', 'court']),
             models.Index(fields=['user', 'date']),
-            models.Index(fields=['status']),
+            models.Index(fields=['status', 'date']),
         ]
 
     def __str__(self):
@@ -98,7 +98,10 @@ class Booking(models.Model):
         )
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        # Validate on create only; admin ModelForms and the service layer
+        # validate updates, and skipping it here saves two queries per save.
+        if self._state.adding:
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def clean(self):
@@ -124,7 +127,9 @@ class Booking(models.Model):
 
     @property
     def slot_count(self):
-        return self.slots.count()
+        # `len()` of the related manager uses the prefetch cache (unlike
+        # `.count()`, which always issues a query).
+        return len(self.slots.all())
 
     @property
     def is_consecutive(self):

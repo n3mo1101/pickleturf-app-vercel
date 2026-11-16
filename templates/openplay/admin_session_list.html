@@ -59,7 +59,7 @@
                 <td data-label="Capacity">
                     {{ s.spots_remaining }} / {{ s.capacity }}
                     <div class="progress mt-1" style="height:4px;">
-                        {% widthratio s.participants.count s.capacity 100 as pct %}
+                        {% widthratio s.approved_count s.capacity 100 as pct %}
                         <div class="progress-bar" style="width:{{ pct }}%"></div>
                     </div>
                 </td>
@@ -121,4 +121,6 @@
         </tbody>
     </table>
 </div>
+
+{% include 'includes/pagination.html' with page_obj=sessions query_string=query_string %}
 {% endblock %}

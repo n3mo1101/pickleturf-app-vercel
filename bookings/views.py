@@ -5,10 +5,11 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.views.decorators.http import require_GET
 from courts.models import Court
 from accounts.decorators import admin_or_staff_required
-from core.utils import is_modal_request, safe_next_url
+from core.utils import is_modal_request, paginate, safe_next_url
 from .forms import BookingForm
 from .models import Booking
 from . import services
@@ -20,11 +21,13 @@ from transactions.payments import payments_enabled
 @login_required
 def availability_view(request):
     """Show court availability grid for a selected date."""
-    selected_date_str = request.GET.get('date', date.today().isoformat())
+    selected_date_str = request.GET.get(
+        'date', timezone.localdate().isoformat()
+    )
     try:
         selected_date = date.fromisoformat(selected_date_str)
     except ValueError:
-        selected_date = date.today()
+        selected_date = timezone.localdate()
 
     grid     = services.get_availability(selected_date)
     brackets = services.get_price_brackets_display()
@@ -32,7 +35,7 @@ def availability_view(request):
     return render(request, 'bookings/availability.html', {
         'grid':          grid,
         'selected_date': selected_date,
-        'today':         date.today().isoformat(),
+        'today':         timezone.localdate().isoformat(),
         'brackets':      brackets,
     })
 
@@ -187,14 +190,13 @@ def my_bookings_view(request):
     """Show logged-in user's booking history with summary and pagination."""
     services.auto_update_booking_statuses()  # Ensure statuses are up-to-date before fetching
 
-    from django.core.paginator import Paginator
     from django.db.models import Count
     from transactions.models import Transaction
 
     all_bookings = (
         Booking.objects
         .filter(user=request.user)
-        .select_related('court')
+        .select_related('court', 'transaction')
         .prefetch_related('slots')
         .order_by('-date', '-start_time')
     )
@@ -213,12 +215,11 @@ def my_bookings_view(request):
     )
 
     # ── Pagination ─────────────────────────────────────────────────
-    paginator = Paginator(all_bookings, 10)
-    page      = request.GET.get('page', 1)
-    bookings  = paginator.get_page(page)
+    bookings, query_string = paginate(request, all_bookings, 10)
 
     return render(request, 'bookings/my_bookings.html', {
         'bookings':       bookings,
+        'query_string':   query_string,
         'total_bookings': total_bookings,
         'total_spent':    total_spent,
         'payments_enabled': payments_enabled(),
@@ -273,8 +274,11 @@ def admin_booking_list_view(request):
             | Q(user__email__icontains=q)
         )
 
+    page_obj, query_string = paginate(request, bookings, 25)
+
     return render(request, 'bookings/admin_booking_list.html', {
-        'bookings':       bookings,
+        'bookings':       page_obj,
+        'query_string':   query_string,
         'courts':         Court.objects.filter(is_active=True),
         'status_choices': Booking.Status.choices,
         'status_filter':  status_filter,
@@ -354,8 +358,6 @@ def staff_bookings_view(request):
     Show bookings created by the logged-in staff member.
     Useful for staff to track bookings they personally processed.
     """
-    from django.core.paginator import Paginator
-
     services.auto_update_booking_statuses()
 
     bookings = (
@@ -384,13 +386,7 @@ def staff_bookings_view(request):
             | Q(user__email__icontains=q)
         )
 
-    query_params = request.GET.copy()
-    query_params.pop('page', None)
-    query_string = query_params.urlencode()
-
-    paginator = Paginator(bookings, 10)
-    page      = request.GET.get('page', 1)
-    bookings  = paginator.get_page(page)
+    bookings, query_string = paginate(request, bookings, 10)
 
     return render(request, 'bookings/staff_bookings.html', {
         'bookings':       bookings,
