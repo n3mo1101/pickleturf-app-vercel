@@ -136,7 +136,10 @@ ACCOUNT_CONFIRM_EMAIL_ON_GET      = True
 ACCOUNT_LOGOUT_ON_GET             = True
 ACCOUNT_ADAPTER                   = 'accounts.adapters.AccountAdapter'
 SOCIALACCOUNT_ADAPTER             = 'accounts.adapters.SocialAccountAdapter'
-ACCOUNT_FORMS                     = {'signup': 'accounts.forms.CustomSignupForm'}
+ACCOUNT_FORMS                     = {
+    'login':  'accounts.forms.CustomLoginForm',
+    'signup': 'accounts.forms.CustomSignupForm',
+}
 SOCIALACCOUNT_LOGIN_ON_GET        = True
 
 LOGIN_URL = '/accounts/login/'
@@ -181,7 +184,10 @@ CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
 ACCOUNT_ADAPTER        = 'accounts.adapters.AccountAdapter'
 SOCIALACCOUNT_ADAPTER  = 'accounts.adapters.SocialAccountAdapter'
-ACCOUNT_FORMS          = {'signup': 'accounts.forms.CustomSignupForm'}
+ACCOUNT_FORMS          = {
+    'login':  'accounts.forms.CustomLoginForm',
+    'signup': 'accounts.forms.CustomSignupForm',
+}
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {

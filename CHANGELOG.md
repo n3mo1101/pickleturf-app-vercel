@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-16 — Profile, sign-in, and admin landing fixes
+
+### Changed
+- Profile page raises the full name onto the cover in white and lifts the email just below it
+- Login field is labelled `Username or email` and its inputs no longer show placeholders
+- Password reset link under the login form uses a theme-aware color
+
+### Fixed
+- Removed the duplicate `Forgot your password?` help text from the login form
+- Admins and staff landing on `/` (including the installed PWA) are redirected to `dashboard`
+- Service worker no longer caches HTML pages, preventing stale pages after login (`pickleturf-v5`)
+
 ## 2026-11-11 — Inventory type and detail refinements
 
 ### Changed

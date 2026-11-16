@@ -10,7 +10,8 @@
     {% csrf_token %}
     {{ form|crispy }}
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <a href="{% url 'account_reset_password' %}" class="small text-muted">
+        <a href="{% url 'account_reset_password' %}"
+           class="small fw-semibold text-navy text-decoration-none">
             Forgot password?
         </a>
     </div>

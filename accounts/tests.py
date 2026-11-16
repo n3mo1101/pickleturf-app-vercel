@@ -1,6 +1,7 @@
 # accounts/tests.py
 
 from django.test import TestCase
+from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -68,3 +69,23 @@ class UserModelTests(TestCase):
                 first_name='Dup',
                 last_name='User',
             )
+
+
+class LoginPageTests(TestCase):
+
+    def setUp(self):
+        self.url = reverse('account_login')
+
+    def test_login_field_labelled_username_or_email(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('Username or email', html)
+
+    def test_login_inputs_have_no_placeholders(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertNotIn('placeholder="Username or email"', html)
+        self.assertNotIn('placeholder="Password"', html)
+
+    def test_single_password_reset_link(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertNotIn('Forgot your password?', html)
+        self.assertEqual(html.count('Forgot password?'), 1)

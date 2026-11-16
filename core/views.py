@@ -1,12 +1,14 @@
 from datetime import date
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.http import FileResponse
 import os
 
 
 def home_view(request):
-    """Landing for guests, customer home for authenticated users."""
+    """Landing for guests, customer home for customers, dashboard for staff."""
     if request.user.is_authenticated:
+        if request.user.is_admin_or_staff:
+            return redirect('dashboard:index')
         return _customer_home(request)
     return render(request, 'core/landing.html')
 

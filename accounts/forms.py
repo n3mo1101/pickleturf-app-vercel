@@ -1,6 +1,23 @@
 from django import forms
-from allauth.account.forms import SignupForm
+from allauth.account.forms import LoginForm, SignupForm
 from .models import User
+
+
+class CustomLoginForm(LoginForm):
+    """Login field labelled for username/email sign-in, without placeholders."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        login = self.fields['login']
+        login.label = 'Username or email'
+        login.widget.attrs.pop('placeholder', None)
+
+        password = self.fields['password']
+        password.widget.attrs.pop('placeholder', None)
+        # allauth adds a "Forgot your password?" help text here; the login
+        # template already renders the reset link, so drop the duplicate.
+        password.help_text = ''
 
 
 class CustomSignupForm(SignupForm):

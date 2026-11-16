@@ -1,18 +1,15 @@
 /* ============================================================
    PICKLETURF SERVICE WORKER
-   Cache-first for static assets, network-first for pages
+   Stale-while-revalidate for static assets, network-only for pages
    ============================================================ */
 
-const CACHE_VERSION  = 'pickleturf-v4';
+const CACHE_VERSION  = 'pickleturf-v5';
 const STATIC_CACHE   = `${CACHE_VERSION}-static`;
-const DYNAMIC_CACHE  = `${CACHE_VERSION}-dynamic`;
 
 // ── Assets to pre-cache on install ────────────────────────────
+// Static assets and the generic offline page only. HTML pages are
+// never pre-cached: they differ per user and per session.
 const STATIC_ASSETS = [
-    '/',
-    '/bookings/',
-    '/openplay/',
-    '/inventory/shop/',
     '/static/css/base.css',
     '/static/css/components.css',
     '/static/css/pages.css',
@@ -29,22 +26,18 @@ const STATIC_ASSETS = [
     'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap',
 ];
 
-// ── Pages to cache dynamically when visited ────────────────────
-const CACHEABLE_PAGES = [
-    '/',
-    '/bookings/',
-    '/bookings/my/',
-    '/openplay/',
-    '/inventory/shop/',
-    '/dashboard/',
-    '/transactions/',
-];
-
 // ── Install ────────────────────────────────────────────────────
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(STATIC_CACHE)
-            .then(cache => cache.addAll(STATIC_ASSETS))
+            .then(cache => Promise.all(
+                // Cache each asset independently so a single failure
+                // (offline, 404, CDN hiccup) cannot abort installation.
+                STATIC_ASSETS.map(url =>
+                    cache.add(new Request(url, { cache: 'reload' }))
+                        .catch(() => {})
+                )
+            ))
             .then(() => self.skipWaiting())
     );
 });
@@ -56,8 +49,7 @@ self.addEventListener('activate', event => {
             Promise.all(
                 keys
                     .filter(key => key.startsWith('pickleturf-') &&
-                                   key !== STATIC_CACHE &&
-                                   key !== DYNAMIC_CACHE)
+                                   key !== STATIC_CACHE)
                     .map(key => caches.delete(key))
             )
         ).then(() => self.clients.claim())
@@ -73,7 +65,7 @@ self.addEventListener('fetch', event => {
     if (request.method !== 'GET') return;
     if (!url.protocol.startsWith('http')) return;
 
-    // Skip admin and API calls — always network
+    // Skip admin and auth flows — always network
     if (url.pathname.startsWith('/admin/')) return;
     if (url.pathname.startsWith('/accounts/')) return;
 
@@ -105,29 +97,15 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // ── HTML pages: network-first, fall back to cache ──────────
-    if (request.headers.get('accept')?.includes('text/html')) {
+    // ── HTML pages: network-only, offline fallback ────────────
+    // Pages are NEVER written to a cache. Responses can be
+    // personalised (dashboard, my bookings, transactions) and a
+    // shared device would otherwise show one user's data to the
+    // next person after logout.
+    if (request.mode === 'navigate' ||
+        request.headers.get('accept')?.includes('text/html')) {
         event.respondWith(
-            fetch(request)
-                .then(response => {
-                    // Cache successful page responses
-                    if (
-                        response.ok &&
-                        CACHEABLE_PAGES.some(p => url.pathname === p ||
-                                                   url.pathname.startsWith(p))
-                    ) {
-                        const clone = response.clone();
-                        caches.open(DYNAMIC_CACHE)
-                            .then(cache => cache.put(request, clone));
-                    }
-                    return response;
-                })
-                .catch(() =>
-                    // Network failed — try cache, else show offline page
-                    caches.match(request).then(cached =>
-                        cached || caches.match('/offline/')
-                    )
-                )
+            fetch(request).catch(() => caches.match('/offline/'))
         );
         return;
     }
