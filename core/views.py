@@ -1,6 +1,7 @@
 from datetime import date
 from django.shortcuts import redirect, render
 from django.http import FileResponse
+from django.utils import timezone
 import os
 
 
@@ -17,10 +18,13 @@ def _customer_home(request):
     from bookings.models import Booking
     from bookings.services import auto_update_booking_statuses
     from openplay.models import OpenPlaySession
-    from openplay.services import auto_update_session_statuses
+    from openplay.services import (
+        annotate_participant_counts,
+        auto_update_session_statuses,
+    )
     from announcements.models import Announcement
 
-    today = date.today()
+    today = timezone.localdate()
 
     # Auto-update stale bookings and open play sessions on every home load
     auto_update_booking_statuses()
@@ -38,14 +42,12 @@ def _customer_home(request):
         .order_by('date', 'start_time')[:6]
     )
 
-    todays_sessions = (
-        OpenPlaySession.objects
-        .filter(
+    todays_sessions = annotate_participant_counts(
+        OpenPlaySession.objects.filter(
             date=today,
             status__in=['open', 'full']
         )
-        .order_by('start_time')
-    )
+    ).order_by('start_time')
 
     announcements = Announcement.objects.filter(
         is_active=True

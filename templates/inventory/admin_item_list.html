@@ -1,4 +1,5 @@
 {% extends 'layouts/base.html' %}
+{% load images %}
 {% block title %}Inventory{% endblock %}
 
 {% block content %}
@@ -102,7 +103,8 @@
                 <td data-label="Item">
                     <div class="d-flex align-items-center gap-2">
                         {% if item.image %}
-                        <img src="{{ item.image.url }}" width="36" height="36"
+                        <img src="{% image_url item.image 'thumb' %}"
+                             width="36" height="36" loading="lazy" decoding="async"
                              class="rounded" style="object-fit:cover;" alt="">
                         {% else %}
                         <div class="bg-navy rounded d-flex align-items-center
@@ -195,4 +197,6 @@
         </tbody>
     </table>
 </div>
+
+{% include 'includes/pagination.html' with page_obj=items query_string=query_string %}
 {% endblock %}

@@ -261,7 +261,7 @@
                         </div>
                         <div class="mt-1">
                             <div class="progress" style="height:4px;">
-                                {% widthratio s.participants.count s.capacity 100 as pct %}
+                                {% widthratio s.approved_count s.capacity 100 as pct %}
                                 <div class="progress-bar" style="width:{{ pct }}%"></div>
                             </div>
                             <div class="text-muted mt-1" style="font-size:.7rem;">

@@ -1,5 +1,6 @@
 from django import forms
 from allauth.account.forms import LoginForm, SignupForm
+from core.validators import validate_image_upload
 from .models import User
 
 
@@ -49,3 +50,6 @@ class ProfileUpdateForm(forms.ModelForm):
             }),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
         }
+
+    def clean_avatar(self):
+        return validate_image_upload(self.cleaned_data.get('avatar'))

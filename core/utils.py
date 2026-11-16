@@ -1,3 +1,4 @@
+from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
@@ -20,3 +21,15 @@ def safe_next_url(request, candidate):
     ):
         return candidate
     return None
+
+
+def paginate(request, queryset, per_page):
+    """Return ``(page_obj, query_string)`` for a paginated list view.
+
+    ``query_string`` carries the current filters (minus ``page``) so the
+    pagination links preserve them.
+    """
+    page_obj = Paginator(queryset, per_page).get_page(request.GET.get('page'))
+    params = request.GET.copy()
+    params.pop('page', None)
+    return page_obj, params.urlencode()

@@ -168,4 +168,6 @@
         </tbody>
     </table>
 </div>
+
+{% include 'includes/pagination.html' with page_obj=bookings query_string=query_string %}
 {% endblock %}

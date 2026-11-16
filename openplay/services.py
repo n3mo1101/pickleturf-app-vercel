@@ -1,11 +1,16 @@
-from datetime import datetime
-
 from django.core.exceptions import ValidationError
+from django.db.models import Count, Q
 from django.utils import timezone
 from .models import OpenPlaySession, OpenPlayParticipant
 
 
 # ── Session Helpers ────────────────────────────────────────────────────────────
+
+def _has_ended(session, now=None):
+    """True once the session's end time has passed (business timezone)."""
+    now = now or timezone.localtime()
+    return (session.date, session.end_time) <= (now.date(), now.time())
+
 
 def auto_update_session_statuses():
     """
@@ -15,49 +20,62 @@ def auto_update_session_statuses():
     and cancelled or already-completed sessions are left untouched.
     Called by the daily cron, page loads, the dashboard, and the customer
     home so stale sessions never stay "upcoming".
-    """
-    now = timezone.now()
-    today = timezone.localdate()
 
-    sessions = OpenPlaySession.objects.filter(
+    Runs as a single bulk UPDATE so it stays cheap on page loads.
+    """
+    local = timezone.localtime()
+
+    OpenPlaySession.objects.filter(
         status__in=[
             OpenPlaySession.Status.OPEN,
             OpenPlaySession.Status.FULL,
         ],
-        date__lte=today,
+    ).filter(
+        Q(date__lt=local.date())
+        | Q(date=local.date(), end_time__lte=local.time())
+    ).update(status=OpenPlaySession.Status.COMPLETED)
+
+
+def annotate_participant_counts(queryset):
+    """Attach participant counts so templates never run per-row COUNTs."""
+    return queryset.annotate(
+        approved_count=Count(
+            'participants',
+            filter=Q(
+                participants__status=OpenPlayParticipant.Status.APPROVED
+            ),
+            distinct=True,
+        ),
+        pending_count=Count(
+            'participants',
+            filter=Q(
+                participants__status=OpenPlayParticipant.Status.PENDING
+            ),
+            distinct=True,
+        ),
     )
-
-    for session in sessions:
-        end_dt = timezone.make_aware(
-            datetime.combine(session.date, session.end_time)
-        )
-        if end_dt > now:
-            continue   # still running or in the future
-
-        session.status = OpenPlaySession.Status.COMPLETED
-        session.save(update_fields=['status'])
 
 
 def _ensure_session_accepts_participants(session):
     """Reject approvals/additions once a session is closed or has ended."""
     if session.status == OpenPlaySession.Status.CANCELLED:
         raise ValidationError('This session has been cancelled.')
-    if session.status == OpenPlaySession.Status.COMPLETED:
+    if session.status == OpenPlaySession.Status.COMPLETED or _has_ended(session):
         raise ValidationError('This session has already ended.')
 
 
 def get_upcoming_sessions():
     """Return all open/upcoming sessions sorted by date."""
-    return OpenPlaySession.objects.filter(
+    return annotate_participant_counts(OpenPlaySession.objects.filter(
         status__in=[OpenPlaySession.Status.OPEN, OpenPlaySession.Status.FULL]
-    ).order_by('date', 'start_time')
+    )).order_by('date', 'start_time')
 
 
 def get_past_sessions():
     """Return completed/cancelled sessions."""
-    return OpenPlaySession.objects.filter(
+    return annotate_participant_counts(OpenPlaySession.objects.filter(
         status__in=[OpenPlaySession.Status.COMPLETED, OpenPlaySession.Status.CANCELLED]
-    ).order_by('-date', '-start_time')
+    )).order_by('-date', '-start_time')
 
 
 # ── Join / Leave ───────────────────────────────────────────────────────────────
@@ -70,7 +88,7 @@ def request_join(user, session):
     if session.status == OpenPlaySession.Status.CANCELLED:
         raise ValidationError('This session has been cancelled.')
 
-    if session.status == OpenPlaySession.Status.COMPLETED:
+    if session.status == OpenPlaySession.Status.COMPLETED or _has_ended(session):
         raise ValidationError('This session has already ended.')
 
     already = OpenPlayParticipant.objects.filter(

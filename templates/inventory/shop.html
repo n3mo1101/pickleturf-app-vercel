@@ -1,4 +1,5 @@
 {% extends 'layouts/base.html' %}
+{% load images %}
 {% block title %}Shop{% endblock %}
 
 {% block content %}
@@ -54,7 +55,13 @@
 
             {# Item Image #}
             {% if item.image %}
-            <img src="{{ item.image.url }}" class="card-img-top shop-card-img"
+            <img src="{% image_url item.image 'card' %}"
+                 srcset="{% image_srcset item.image 'card' %}"
+                 sizes="(max-width: 768px) 100vw, 320px"
+                 width="640" height="360"
+                 {% if forloop.counter <= 4 %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %}
+                 decoding="async"
+                 class="card-img-top shop-card-img"
                  alt="{{ item.name }}">
             {% else %}
             <div class="shop-card-img shop-card-placeholder bg-light d-flex align-items-center justify-content-center">
@@ -117,6 +124,8 @@
     </div>
     {% endfor %}
 </div>
+
+{% include 'includes/pagination.html' with page_obj=items query_string=query_string %}
 
 {% else %}
 <div class="text-center py-5 text-muted">

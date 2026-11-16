@@ -97,7 +97,7 @@ class Transaction(models.Model):
         indexes  = [
             models.Index(fields=['tx_type', 'created_at']),
             models.Index(fields=['user', 'created_at']),
-            models.Index(fields=['payment_status']),
+            models.Index(fields=['payment_status', 'created_at']),
         ]
 
     def __str__(self):
