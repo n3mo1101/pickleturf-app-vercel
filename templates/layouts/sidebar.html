@@ -35,13 +35,6 @@
             <span>Dashboard</span>
         </a>
 
-        {# Announcements #}
-        <a href="{% url 'announcements:admin_list' %}"
-           class="pt-nav-link {% if '/announcements/' in request.path %}active{% endif %}">
-            <i class="bi bi-megaphone nav-icon"></i>
-            <span>Announcements</span>
-        </a>
-
         {# Booking (dropdown) #}
         <a class="pt-nav-link {% if '/bookings/' in request.path %}parent-active{% endif %}"
            data-bs-toggle="collapse"
@@ -107,6 +100,13 @@
            class="pt-nav-link {% if '/transactions/' in request.path %}active{% endif %}">
             <i class="bi bi-cash-stack nav-icon"></i>
             <span>Transactions</span>
+        </a>
+
+        {# Announcements #}
+        <a href="{% url 'announcements:admin_list' %}"
+           class="pt-nav-link {% if '/announcements/' in request.path %}active{% endif %}">
+            <i class="bi bi-megaphone nav-icon"></i>
+            <span>Announcements</span>
         </a>
 
         {% else %}

@@ -143,6 +143,12 @@ ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = int(
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_CONFIRM_EMAIL_ON_GET      = True
 ACCOUNT_LOGOUT_ON_GET             = True
+# Subjects are branded in the templates themselves ("Confirm your PickleTurf
+# account"), so drop allauth's "[Site name] " prefix.
+ACCOUNT_EMAIL_SUBJECT_PREFIX      = ''
+# Security notices for password/email changes (allauth ships these but leaves
+# them off by default).
+ACCOUNT_EMAIL_NOTIFICATIONS       = True
 ACCOUNT_ADAPTER                   = 'accounts.adapters.AccountAdapter'
 SOCIALACCOUNT_ADAPTER             = 'accounts.adapters.SocialAccountAdapter'
 ACCOUNT_FORMS                     = {

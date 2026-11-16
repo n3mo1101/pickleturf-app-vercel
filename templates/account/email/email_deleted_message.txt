@@ -1,0 +1,16 @@
+{% autoescape off %}Hi {{ user.first_name|default:"there" }},
+
+{{ deleted_email }} was removed from your PickleTurf account. It can no longer
+be used to sign in or recover the account.
+
+If this was you, there's nothing to do.
+
+If it wasn't you, reset your password right away:
+{{ password_reset_url }}
+
+Change details:
+- IP address: {{ ip|default:"unknown" }}
+- Browser: {{ user_agent|default:"unknown" }}
+- Date: {{ timestamp|default:"just now" }}
+
+-- The PickleTurf Team{% endautoescape %}

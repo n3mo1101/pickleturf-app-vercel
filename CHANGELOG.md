@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-11-16 — Branded transactional emails
+
+### Added
+- Branded PickleTurf HTML emails for confirmation, password reset, account-exists, unknown-account, and the five security notifications, each with a plain-text fallback
+- Shared email shell and partials in `templates/account/email/` (`base_email.html`, button, fallback link, security note)
+- `preview_emails` management command to render every email to `_preview/` for review (`--open` supported)
+- Email design tests in `accounts/tests.py`, including an HTML-part assertion for every template
+
+### Changed
+- `ACCOUNT_EMAIL_NOTIFICATIONS` is now enabled, so password/email change notices are actually sent
+- Notification emails include an absolute "reset my password" link via `accounts/adapters.py`
+- `ACCOUNT_EMAIL_SUBJECT_PREFIX` is empty; subjects are branded per template
+
+### Fixed
+- Emails no longer carry the stale `[PickleballHub]` subject prefix (the `Site` record was renamed to PickleTurf)
+
 ## 2026-11-16 — Email verification on signup
 
 ### Added

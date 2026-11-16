@@ -50,6 +50,23 @@ class AccountAdapter(DefaultAccountAdapter):
         # which sends customers to an admin-only page and shows "Access denied."
         return self._post_auth_redirect(request)
 
+    def send_notification_mail(self, template_prefix, user, context=None, email=None):
+        """
+        Security notification emails include a "reset my password" CTA, so give
+        them an absolute URL to the reset form.
+        """
+        ctx = dict(context or {})
+        request = getattr(self, 'request', None)
+        if request is not None:
+            from allauth.account.internal.flows.password_reset import (
+                get_reset_password_url,
+            )
+
+            ctx.setdefault('password_reset_url', get_reset_password_url(request))
+        return super().send_notification_mail(
+            template_prefix, user, ctx, email=email
+        )
+
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
 

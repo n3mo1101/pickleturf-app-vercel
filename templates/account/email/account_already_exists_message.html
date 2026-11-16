@@ -1,0 +1,28 @@
+{% extends "account/email/base_email.html" %}
+
+{% block title %}You already have a PickleTurf account{% endblock %}
+{% block preheader %}That email address is already registered.{% endblock %}
+{% block heading %}You already have an account{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hi there,</p>
+<p style="margin:0 0 16px;">
+    Someone just tried to sign up for PickleTurf with
+    <strong style="color:#1B2A4A;">{{ email }}</strong>, but that address is
+    already registered.
+</p>
+<p style="margin:0 0 24px;">
+    If that was you, recover your account with the button below. Already know
+    your password? Just sign in as usual at PickleTurf.
+</p>
+
+{% include "account/email/_button.html" with url=password_reset_url label="Reset my password" %}
+{% include "account/email/_fallback_link.html" with url=password_reset_url %}
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#8A93A5;">
+    If this wasn't you, no action is needed &mdash; nobody can access the
+    account without its password.
+</p>
+{% endblock %}
+
+{% block footer_note %}You're receiving this because this address is registered with PickleTurf.{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "account/email/base_email.html" %}
+
+{% block title %}An email address was removed from your PickleTurf account{% endblock %}
+{% block preheader %}An address was removed from your account.{% endblock %}
+{% block heading %}An email address was removed{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hi {{ user.first_name|default:"there" }},</p>
+<p style="margin:0 0 16px;">
+    <strong style="color:#1B2A4A;">{{ deleted_email }}</strong> was removed from
+    your PickleTurf account. It can no longer be used to sign in or recover the
+    account.
+</p>
+<p style="margin:0 0 24px;">
+    If this was you, there's nothing to do.
+</p>
+
+{% include "account/email/_security_note.html" %}
+{% endblock %}
+
+{% block footer_note %}You're receiving this because an address was removed from your PickleTurf account.{% endblock %}

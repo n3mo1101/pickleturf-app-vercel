@@ -1,0 +1,26 @@
+{% extends "account/email/base_email.html" %}
+
+{% block title %}No PickleTurf account found{% endblock %}
+{% block preheader %}We couldn't find an account using that email address.{% endblock %}
+{% block heading %}We couldn't find that account{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hi there,</p>
+<p style="margin:0 0 16px;">
+    Someone tried to sign in or reset a password for
+    <strong style="color:#1B2A4A;">{{ email }}</strong>, but no PickleTurf
+    account uses that address.
+</p>
+<p style="margin:0 0 24px;">
+    If it was you, you can create an account in a couple of minutes.
+</p>
+
+{% include "account/email/_button.html" with url=signup_url label="Create an account" %}
+{% include "account/email/_fallback_link.html" with url=signup_url %}
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#8A93A5;">
+    If this wasn't you, you can safely ignore this email.
+</p>
+{% endblock %}
+
+{% block footer_note %}You're receiving this because someone used this address on PickleTurf.{% endblock %}

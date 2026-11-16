@@ -1,0 +1,57 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <title>{% block title %}PickleTurf{% endblock %}</title>
+    <!--[if mso]>
+    <style>
+        body, table, td, p, a, h1 { font-family: Arial, Helvetica, sans-serif !important; }
+    </style>
+    <![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#F3F4F7;">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#F3F4F7;">{% block preheader %}PickleTurf{% endblock %}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F3F4F7" style="background-color:#F3F4F7;">
+    <tr>
+        <td align="center" style="padding:28px 12px;">
+
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#FFFFFF;border-radius:14px;">
+                <tr>
+                    <td height="4" bgcolor="#F5C518" style="height:4px;line-height:4px;font-size:0;border-radius:14px 14px 0 0;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td bgcolor="#1B2A4A" style="background-color:#1B2A4A;padding:20px 32px;">
+                        <span style="font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:19px;font-weight:800;letter-spacing:1.5px;color:#FFFFFF;text-transform:uppercase;">Pickle<span style="color:#F5C518;">Turf</span></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:34px 32px 6px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                        <h1 style="margin:0 0 18px;font-size:23px;line-height:1.3;font-weight:700;color:#1B2A4A;">{% block heading %}{% endblock %}</h1>
+                        <div style="font-size:15px;line-height:1.65;color:#3F4759;">
+                            {% block content %}{% endblock %}
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:26px 32px 30px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                        <div style="height:1px;line-height:1px;font-size:0;background-color:#E8EAF0;margin-bottom:18px;">&nbsp;</div>
+                        <p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#8A93A5;">
+                            <strong style="color:#1B2A4A;letter-spacing:.5px;">PickleTurf</strong>{% if current_site %} &middot; {{ current_site.domain }}{% endif %}
+                        </p>
+                        <p style="margin:0;font-size:12px;line-height:1.6;color:#8A93A5;">
+                            {% block footer_note %}Court reservations, open play, and equipment &mdash; all in one place.{% endblock %}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+        </td>
+    </tr>
+</table>
+</body>
+</html>

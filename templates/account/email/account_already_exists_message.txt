@@ -1,0 +1,15 @@
+{% autoescape off %}Hi there,
+
+Someone just tried to sign up for PickleTurf with {{ email }}, but that address
+already has an account.
+
+If that was you, reset your password to get back in:
+
+{{ password_reset_url }}
+
+Already know your password? Just sign in as usual.
+
+If this wasn't you, no action is needed -- nobody can access the account
+without its password.
+
+-- The PickleTurf Team{% endautoescape %}

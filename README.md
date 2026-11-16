@@ -62,7 +62,7 @@ pickleturf-app-vercel/
 └── templates/      # All HTML templates
 ```
 
-Management commands: `seed_courts`, `update_booking_statuses`, `mark_emails_verified`.
+Management commands: `seed_courts`, `update_booking_statuses`, `mark_emails_verified`, `preview_emails`.
 
 ---
 
@@ -100,6 +100,7 @@ sign-ins skip this, because the provider has already verified the address.
 | `EMAIL_HOST_USER` | Gmail address that sends the mail |
 | `EMAIL_HOST_PASSWORD` | 16-character Google App Password |
 | `DEFAULT_FROM_EMAIL` | `PickleTurf <same-gmail-address>` |
+| `ACCOUNT_EMAIL_NOTIFICATIONS` | `True` in `config/settings.py` (security notices are off by default in allauth) |
 
 Local development prints the confirmation link to the `runserver` terminal
 when `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend`.
@@ -118,6 +119,33 @@ python manage.py mark_emails_verified
 
 Verification emails are throttled to one per address every 3 minutes, and
 unverified users get a fresh link whenever they try to sign in.
+
+---
+
+## Transactional Email Design
+
+Every customer-facing email (confirmation, password reset, account-exists,
+unknown-account, and the five security notices) is a branded PickleTurf HTML
+email with a plain-text fallback.
+
+- Templates live in `templates/account/email/`. Each has a `_message.html`
+  design and a matching `.txt` fallback; the shared shell is
+  `base_email.html` with partials for the button, fallback link, and security
+  note.
+- Styling is inline CSS only (no `<style>` blocks except the Outlook font
+  shim), forming a 600px table layout on a navy `#1B2A4A` header with a
+  `#F5C518` accent.
+- Subjects are set per template, so `ACCOUNT_EMAIL_SUBJECT_PREFIX` is empty and
+  no `[PickleTurf]` prefix is added.
+- The `Site` record must say `PickleTurf` — the footer prints
+  `current_site.domain`.
+
+Preview the whole set in a browser (output goes to `_preview/`, gitignored):
+
+```bash
+python manage.py preview_emails          # writes _preview/index.html
+python manage.py preview_emails --open   # and opens it
+```
 
 ---
 

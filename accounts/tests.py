@@ -2,15 +2,20 @@
 
 import re
 from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
 from allauth.account.models import EmailAddress
 from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
+from django.template.loader import render_to_string
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+
+from accounts.management.commands.preview_emails import Command as PreviewEmails
 
 User = get_user_model()
 
@@ -222,3 +227,121 @@ class MarkEmailsVerifiedCommandTests(TestCase):
         self.run_command()
         self.run_command()
         self.assertTrue(EmailAddress.objects.get(user=self.user).verified)
+
+
+class EmailDesignTests(TestCase):
+
+    SIGNUP_DATA = {
+        'first_name': 'Design',
+        'last_name':  'Check',
+        'phone':      '',
+        'password1':  'securepass123',
+        'password2':  'securepass123',
+    }
+
+    def setUp(self):
+        cache.clear()
+
+    def signup(self, email):
+        return self.client.post(
+            reverse('account_signup'), {'email': email, **self.SIGNUP_DATA}
+        )
+
+    def html_part(self, message):
+        self.assertTrue(message.alternatives, 'email has no HTML alternative')
+        body, mimetype = message.alternatives[0]
+        self.assertEqual(mimetype, 'text/html')
+        return body
+
+    def make_user(self, email='notify@example.com'):
+        user = User.objects.create_user(
+            email=email,
+            password='securepass123',
+            first_name='Notify',
+            last_name='User',
+        )
+        EmailAddress.objects.create(
+            user=user, email=email, primary=True, verified=True
+        )
+        return user
+
+    @override_settings(ACCOUNT_EMAIL_VERIFICATION='mandatory')
+    def test_confirmation_email_is_branded_html(self):
+        self.signup('brand.new@example.com')
+
+        message = mail.outbox[0]
+        html = self.html_part(message)
+
+        self.assertEqual(message.subject, 'Confirm your PickleTurf account')
+        self.assertIn('Confirm my email', html)
+        self.assertIn('/accounts/confirm-email/', html)
+        self.assertIn('expires in 24 hours', html)
+        self.assertIn('Pickle<span style="color:#F5C518;">Turf</span>', html)
+
+    def test_password_reset_email_is_branded_html(self):
+        user = self.make_user('reset.me@example.com')
+
+        self.client.post(reverse('account_reset_password'), {'email': user.email})
+
+        html = self.html_part(mail.outbox[-1])
+        self.assertIn('Choose a new password', html)
+        self.assertIn('/accounts/password/reset/key/', html)
+
+    def test_duplicate_signup_sends_branded_account_exists_email(self):
+        self.make_user('taken@example.com')
+
+        self.signup('taken@example.com')
+
+        message = mail.outbox[-1]
+        self.assertEqual(message.subject, 'You already have a PickleTurf account')
+        self.assertIn('You already have an account', self.html_part(message))
+
+    def test_unknown_account_email_is_branded_html(self):
+        self.client.post(
+            reverse('account_reset_password'), {'email': 'nobody@example.com'}
+        )
+
+        html = self.html_part(mail.outbox[-1])
+        self.assertIn("couldn't find that account", html)
+        self.assertIn('Create an account', html)
+
+    def test_password_change_notification_has_absolute_reset_link(self):
+        user = self.make_user()
+        self.client.force_login(user)
+
+        self.client.post(
+            reverse('account_change_password'),
+            {
+                'oldpassword': 'securepass123',
+                'password1': 'brandnewpass456',
+                'password2': 'brandnewpass456',
+            },
+        )
+
+        message = mail.outbox[-1]
+        self.assertEqual(message.subject, 'Your PickleTurf password was changed')
+        html = self.html_part(message)
+        self.assertIn('Your password was changed', html)
+
+        # The "reset it" CTA must be a full URL the mail client can open.
+        reset_url = re.search(r'href="(http[^"]*password/reset[^"]*)"', html)
+        self.assertIsNotNone(reset_url)
+        self.assertTrue(reset_url.group(1).startswith('http://'))
+
+    def test_every_email_template_renders(self):
+        context = PreviewEmails().context()
+        names = [name for name, _ in PreviewEmails.TEMPLATES]
+        names += [name.replace('.html', '.txt') for name, _ in PreviewEmails.TEMPLATES]
+
+        for name in names:
+            with self.subTest(template=name):
+                self.assertTrue(render_to_string(name, context).strip())
+
+    def test_preview_command_writes_files(self):
+        with TemporaryDirectory() as tmp:
+            call_command('preview_emails', output=tmp, stdout=StringIO())
+
+            index = Path(tmp) / 'index.html'
+            self.assertTrue(index.exists())
+            self.assertTrue((Path(tmp) / 'confirmation.html').exists())
+

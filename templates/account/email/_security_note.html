@@ -1,0 +1,15 @@
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;background-color:#FEF9E1;border-radius:10px;">
+    <tr>
+        <td style="padding:16px 18px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#5A4A00;">
+                <strong style="color:#1B2A4A;">Didn't do this?</strong>
+                Reset your password right away to secure the account.
+            </p>
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#8A7A20;">
+                IP {{ ip|default:"unknown" }}
+                &middot; {{ timestamp|default:"just now" }}
+                {% if user_agent %}&middot; {{ user_agent|truncatechars:60 }}{% endif %}
+            </p>
+        </td>
+    </tr>
+</table>

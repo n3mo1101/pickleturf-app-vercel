@@ -1,0 +1,12 @@
+{% autoescape off %}Hi there,
+
+Someone tried to sign in or reset a password for {{ email }}, but no PickleTurf
+account uses that address.
+
+If it was you, you can create an account here:
+
+{{ signup_url }}
+
+If this wasn't you, you can safely ignore this email.
+
+-- The PickleTurf Team{% endautoescape %}

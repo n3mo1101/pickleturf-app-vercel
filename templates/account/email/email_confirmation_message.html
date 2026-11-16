@@ -1,0 +1,24 @@
+{% extends "account/email/base_email.html" %}
+
+{% block title %}Confirm your PickleTurf email{% endblock %}
+{% block preheader %}One click to activate your PickleTurf account.{% endblock %}
+{% block heading %}Confirm your email{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 16px;">Hi {{ user.first_name|default:"there" }},</p>
+<p style="margin:0 0 24px;">
+    Thanks for joining PickleTurf. Tap the button below to confirm
+    <strong style="color:#1B2A4A;">{{ email }}</strong>
+    and activate your account.
+</p>
+
+{% include "account/email/_button.html" with url=activate_url label="Confirm my email" %}
+{% include "account/email/_fallback_link.html" with url=activate_url %}
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#8A93A5;">
+    This link expires in 24 hours. If you didn't create a PickleTurf account,
+    you can safely ignore this email.
+</p>
+{% endblock %}
+
+{% block footer_note %}You're receiving this because this address was used to sign up for PickleTurf.{% endblock %}

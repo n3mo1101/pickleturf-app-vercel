@@ -1,0 +1,17 @@
+{% autoescape off %}Hi {{ user.first_name|default:"there" }},
+
+The email address on your PickleTurf account was changed from
+{{ from_email }} to {{ to_email }}.
+
+If this was you, there's nothing to do -- sign in with your new address from
+now on.
+
+If it wasn't you, reset your password right away:
+{{ password_reset_url }}
+
+Change details:
+- IP address: {{ ip|default:"unknown" }}
+- Browser: {{ user_agent|default:"unknown" }}
+- Date: {{ timestamp|default:"just now" }}
+
+-- The PickleTurf Team{% endautoescape %}
