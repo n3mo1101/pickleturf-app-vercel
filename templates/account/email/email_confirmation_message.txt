@@ -4,6 +4,8 @@ Please confirm your email by clicking the link below:
 
 {{ activate_url }}
 
+This link expires in 24 hours. You can request a new one by signing in.
+
 If you did not register, ignore this email.
 
 – The PickleTurf Team

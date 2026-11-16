@@ -128,10 +128,19 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ─── ALLAUTH CONFIG ────────────────────────────────────────────────────────────
 
-ACCOUNT_LOGIN_METHODS             = {'email', 'username'}  
-ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'              
+ACCOUNT_LOGIN_METHODS             = {'email', 'username'}
+ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_SIGNUP_FIELDS             = ['email*', 'password1*', 'password2*']
-ACCOUNT_EMAIL_VERIFICATION        = os.environ.get('EMAIL_VERIFICATION', 'none') 
+# "none" | "optional" | "mandatory". Mandatory blocks sign-in until the
+# address is confirmed (social logins are already provider-verified).
+ACCOUNT_EMAIL_VERIFICATION = (
+    os.environ.get('ACCOUNT_EMAIL_VERIFICATION', 'none').strip().lower()
+)
+# Confirmation links expire in whole days (allauth has no sub-day setting).
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = int(
+    os.environ.get('ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS', 1)
+)
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_CONFIRM_EMAIL_ON_GET      = True
 ACCOUNT_LOGOUT_ON_GET             = True
 ACCOUNT_ADAPTER                   = 'accounts.adapters.AccountAdapter'
@@ -148,16 +157,23 @@ LOGOUT_REDIRECT_URL = '/'
 
 # ─── EMAIL ────────────────────────────────────────────────────────────────────
 
-if DEBUG:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = os.environ.get('EMAIL_HOST')
-    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
+# Console backend by default in DEBUG so local signups print the confirmation
+# link to the terminal; set EMAIL_BACKEND to override either way.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND') or (
+    'django.core.mail.backends.console.EmailBackend' if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST          = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS       = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL  = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'PickleTurf <no-reply@localhost>'
+)
+
+# Password reset links are single-use; keep them short-lived too.
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', 60 * 60 * 24))
 
 # ─── STATIC & MEDIA ───────────────────────────────────────────────────────────
 
@@ -180,14 +196,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
-# ─── ALLAUTH ADAPTERS ─────────────────────────────────────────────────────────
-
-ACCOUNT_ADAPTER        = 'accounts.adapters.AccountAdapter'
-SOCIALACCOUNT_ADAPTER  = 'accounts.adapters.SocialAccountAdapter'
-ACCOUNT_FORMS          = {
-    'login':  'accounts.forms.CustomLoginForm',
-    'signup': 'accounts.forms.CustomSignupForm',
-}
+# ─── SOCIAL ACCOUNTS ─────────────────────────────────────────────────────────
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {

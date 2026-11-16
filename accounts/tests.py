@@ -1,6 +1,14 @@
 # accounts/tests.py
 
-from django.test import TestCase
+import re
+from io import StringIO
+from urllib.parse import urlparse
+
+from allauth.account.models import EmailAddress
+from django.core import mail
+from django.core.cache import cache
+from django.core.management import call_command
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
@@ -89,3 +97,128 @@ class LoginPageTests(TestCase):
         html = self.client.get(self.url).content.decode()
         self.assertNotIn('Forgot your password?', html)
         self.assertEqual(html.count('Forgot password?'), 1)
+
+
+@override_settings(ACCOUNT_EMAIL_VERIFICATION='mandatory')
+class EmailVerificationTests(TestCase):
+
+    SIGNUP_DATA = {
+        'first_name':    'New',
+        'last_name':     'Customer',
+        'email':         'new@example.com',
+        'phone':         '',
+        'password1':     'securepass123',
+        'password2':     'securepass123',
+    }
+
+    def setUp(self):
+        # allauth rate-limits verification mails per address (3 min), and the
+        # cache outlives a test.
+        cache.clear()
+
+    def signup(self, **overrides):
+        data = {**self.SIGNUP_DATA, **overrides}
+        return self.client.post(reverse('account_signup'), data)
+
+    def confirmation_path(self, body):
+        url = re.search(r'https?://\S+', body).group(0).rstrip('.')
+        return urlparse(url).path
+
+    def test_signup_sends_confirmation_and_keeps_user_signed_out(self):
+        response = self.signup()
+
+        self.assertRedirects(
+            response,
+            reverse('account_email_verification_sent'),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/accounts/confirm-email/', mail.outbox[0].body)
+        self.assertIn('expires in 24 hours', mail.outbox[0].body)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+        user = User.objects.get(email='new@example.com')
+        self.assertFalse(EmailAddress.objects.get(user=user).verified)
+
+    def test_confirming_email_verifies_it_and_logs_in(self):
+        self.signup()
+        path = self.confirmation_path(mail.outbox[0].body)
+
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email='new@example.com')
+        self.assertTrue(EmailAddress.objects.get(user=user).verified)
+        self.assertIn('_auth_user_id', self.client.session)
+
+    def test_unverified_user_cannot_log_in(self):
+        user = User.objects.create_user(
+            email='pending@example.com',
+            password='securepass123',
+            first_name='Pending',
+            last_name='User',
+        )
+        EmailAddress.objects.create(
+            user=user, email='pending@example.com', primary=True, verified=False
+        )
+
+        response = self.client.post(reverse('account_login'), {
+            'login':    'pending@example.com',
+            'password': 'securepass123',
+        })
+
+        self.assertRedirects(
+            response,
+            reverse('account_email_verification_sent'),
+            fetch_redirect_response=False,
+        )
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_verified_user_can_log_in(self):
+        user = User.objects.create_user(
+            email='verified@example.com',
+            password='securepass123',
+            first_name='Verified',
+            last_name='User',
+        )
+        EmailAddress.objects.create(
+            user=user, email='verified@example.com', primary=True, verified=True
+        )
+
+        response = self.client.post(reverse('account_login'), {
+            'login':    'verified@example.com',
+            'password': 'securepass123',
+        })
+
+        self.assertRedirects(response, '/', fetch_redirect_response=False)
+        self.assertIn('_auth_user_id', self.client.session)
+
+
+class MarkEmailsVerifiedCommandTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='legacy@example.com',
+            password='securepass123',
+            first_name='Legacy',
+            last_name='User',
+        )
+        EmailAddress.objects.create(
+            user=self.user, email='legacy@example.com', primary=True, verified=False
+        )
+
+    def run_command(self, *args):
+        call_command('mark_emails_verified', *args, stdout=StringIO())
+
+    def test_marks_existing_addresses_verified(self):
+        self.run_command()
+        self.assertTrue(EmailAddress.objects.get(user=self.user).verified)
+
+    def test_dry_run_does_not_change_anything(self):
+        self.run_command('--dry-run')
+        self.assertFalse(EmailAddress.objects.get(user=self.user).verified)
+
+    def test_command_is_idempotent(self):
+        self.run_command()
+        self.run_command()
+        self.assertTrue(EmailAddress.objects.get(user=self.user).verified)

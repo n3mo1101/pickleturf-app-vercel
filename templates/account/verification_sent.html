@@ -16,8 +16,9 @@
         Click the link in the email to activate your account.
     </p>
     <p class="text-muted small">
-        Didn't receive it? Check your spam folder or
-        <a href="{% url 'account_email' %}">resend the email</a>.
+        Didn't receive it? Check your spam folder, then
+        <a href="{% url 'account_login' %}">sign in again</a>
+        and we'll send a fresh link.
     </p>
     <a href="{% url 'account_login' %}"
        class="btn btn-outline-secondary w-100 mt-3">

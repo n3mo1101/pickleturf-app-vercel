@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-16 — Email verification on signup
+
+### Added
+- `ACCOUNT_EMAIL_VERIFICATION` support (env-driven: `none`, `optional`, `mandatory`) so new accounts must confirm their email before signing in
+- `mark_emails_verified` management command to grandfather existing accounts (`--dry-run` supported)
+- Verification and password-reset flow tests in `accounts/tests.py`
+
+### Changed
+- Confirmation links expire after 1 day and sign the customer in on click
+- Password reset links expire after 1 day, matching the email copy
+- Verification email mentions the 24-hour expiry
+- `EMAIL_BACKEND` is env-overridable and defaults to the console backend in `DEBUG`
+- `DEFAULT_FROM_EMAIL` is read outside the `DEBUG` branch with a fallback
+- Unverified users are pointed to the login page to request a fresh link instead of the login-only email manager
+- Consolidated the duplicated allauth adapter/form settings
+
+### Fixed
+- `ACCOUNT_EMAIL_VERIFICATION` was read from the wrong env var (`EMAIL_VERIFICATION`), so verification could never be enabled
+- Production SMTP settings were only defined for `DEBUG=False`, leaving `DEFAULT_FROM_EMAIL` unset in development
+
 ## 2026-11-16 — Profile, sign-in, and admin landing fixes
 
 ### Changed

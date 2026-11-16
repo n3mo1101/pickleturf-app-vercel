@@ -62,7 +62,7 @@ pickleturf-app-vercel/
 └── templates/      # All HTML templates
 ```
 
-Management commands: `seed_courts`, `update_booking_statuses`.
+Management commands: `seed_courts`, `update_booking_statuses`, `mark_emails_verified`.
 
 ---
 
@@ -82,6 +82,42 @@ python manage.py seed_courts
 python manage.py createsuperuser
 python manage.py runserver
 ```
+
+---
+
+## Email Verification
+
+Signups must confirm their email before they can sign in. Google/Facebook
+sign-ins skip this, because the provider has already verified the address.
+
+| Variable | Value |
+|---|---|
+| `ACCOUNT_EMAIL_VERIFICATION` | `mandatory` (`optional` to warn only, `none` to disable) |
+| `ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS` | `1` |
+| `PASSWORD_RESET_TIMEOUT` | `86400` (seconds) |
+| `EMAIL_BACKEND` | blank = console in `DEBUG`, SMTP otherwise |
+| `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_USE_TLS` | `smtp.gmail.com` / `587` / `True` |
+| `EMAIL_HOST_USER` | Gmail address that sends the mail |
+| `EMAIL_HOST_PASSWORD` | 16-character Google App Password |
+| `DEFAULT_FROM_EMAIL` | `PickleTurf <same-gmail-address>` |
+
+Local development prints the confirmation link to the `runserver` terminal
+when `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend`.
+
+For Gmail, enable 2-Step Verification, create an App Password at
+<https://myaccount.google.com/apppasswords>, and use that instead of the
+account password. Gmail caps sends at roughly 500 recipients/day.
+
+Before enabling `mandatory` on a live site, grandfather existing accounts once
+against the production database:
+
+```bash
+python manage.py mark_emails_verified --dry-run
+python manage.py mark_emails_verified
+```
+
+Verification emails are throttled to one per address every 3 minutes, and
+unverified users get a fresh link whenever they try to sign in.
 
 ---
 
